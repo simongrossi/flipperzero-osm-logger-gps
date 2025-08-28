@@ -1,6 +1,5 @@
-// quick_log.c — Quick logging view (no direct storage here; uses app_save_point)
+// quick_log.c — Quick logging view (no direct storage; uses app_save_point)
 #include <furi.h>
-#include <furi_hal_rtc.h>
 #include <gui/canvas.h>
 #include <gui/view_dispatcher.h>
 #include <gui/view.h>
@@ -24,14 +23,6 @@ const char* app_get_preset_variant(App* app, uint8_t idx, uint8_t* has_variant);
 ViewDispatcher* app_get_view_dispatcher(App* app);
 bool app_save_point(App* app, const char* key, const char* variant, const char* note,
                     double lat, double lon, float hdop, uint8_t sats, const char* quality);
-
-static void iso_ts_now(char* out, size_t out_sz) {
-    DateTime dt;
-    furi_hal_rtc_get_datetime(&dt);
-    snprintf(out, out_sz, "%04u-%02u-%02uT%02u:%02u:%02uZ",
-             (unsigned)dt.year, (unsigned)dt.month, (unsigned)dt.day,
-             (unsigned)dt.hour, (unsigned)dt.minute, (unsigned)dt.second);
-}
 
 typedef struct {
     App* app;
