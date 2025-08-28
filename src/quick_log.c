@@ -1,4 +1,3 @@
-// quick_log.c — Quick logging view (no direct storage; uses app_save_point)
 #include <furi.h>
 #include <gui/canvas.h>
 #include <gui/view_dispatcher.h>
@@ -9,13 +8,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#define QUICKLOG_HDOP_DEFAULT 2.5f
-#define QUICKLOG_ANTI_DBL_MS  800
-#define QUICKLOG_NOTE_MAX     12
-
 typedef struct App App;  // forward-declare
 
-// Interfaces fournies par app.c :
+// Interfaces fournies par app.c
 bool app_get_fix(App* app, double* lat, double* lon, float* hdop, uint8_t* sats);
 uint8_t app_get_preset_count(App* app);
 const char* app_get_preset_key(App* app, uint8_t idx);
@@ -28,8 +23,8 @@ typedef struct {
     App* app;
     View* view;
     uint32_t last_log_tick;
-    float min_hdop;
     uint8_t idx;          // index preset
+    uint32_t view_id;     // ID de la vue (pour refresh)
 } QuickLog;
 
 static void quicklog_draw(Canvas* canvas, void* ctx) {
@@ -60,12 +55,12 @@ static void quicklog_draw(Canvas* canvas, void* ctx) {
     }
     canvas_draw_str(canvas, 4, 42, line2);
 
-    canvas_draw_str(canvas, 4, 58, "OK=Log  OK long=Force/Note  ^v Preset  <> Variant");
+    canvas_draw_str(canvas, 4, 58, "OK=Log  OK long=Force  ^v Preset  <> Variant");
 }
 
 static void quicklog_do_log(QuickLog* ql, bool force_or_note) {
     uint32_t now = furi_get_tick();
-    if(now - ql->last_log_tick < QUICKLOG_ANTI_DBL_MS) return;
+    if(now - ql->last_log_tick < 800) return;
 
     double lat=0, lon=0; float hdop=99; uint8_t sats=0;
     bool valid = app_get_fix(ql->app, &lat, &lon, &hdop, &sats);
@@ -73,12 +68,12 @@ static void quicklog_do_log(QuickLog* ql, bool force_or_note) {
     const char* key = app_get_preset_key(ql->app, ql->idx);
     uint8_t hv=0;
     const char* variant = app_get_preset_variant(ql->app, ql->idx, &hv);
-    const char* quality = (valid && hdop <= QUICKLOG_HDOP_DEFAULT) ? "ok" : "low";
+    const char* quality = (valid && hdop <= 2.5f) ? "ok" : "low";
 
     if(!valid && !force_or_note) { ql->last_log_tick = now; return; }
-    if(valid && (hdop > QUICKLOG_HDOP_DEFAULT) && !force_or_note) { ql->last_log_tick = now; return; }
+    if(valid && (hdop > 2.5f) && !force_or_note) { ql->last_log_tick = now; return; }
 
-    char note[QUICKLOG_NOTE_MAX+1] = {0}; // (pas de saisie pour l’instant)
+    char note[13] = {0};
     bool ok = app_save_point(ql->app, key, variant, note, lat, lon, hdop, sats, quality);
     (void)ok;
     ql->last_log_tick = now;
@@ -88,34 +83,45 @@ static bool quicklog_input(InputEvent* evt, void* ctx) {
     QuickLog* ql = (QuickLog*)ctx;
     if(evt->type != InputTypeShort && evt->type != InputTypeLong) return false;
 
+    bool need_redraw = false;
+
     switch(evt->key) {
-        case InputKeyUp: {
+        case InputKeyUp:
             if(evt->type == InputTypeShort) {
                 uint8_t cnt = app_get_preset_count(ql->app);
-                if(cnt) ql->idx = (uint8_t)((ql->idx + cnt - 1) % cnt);
+                if(cnt) { ql->idx = (uint8_t)((ql->idx + cnt - 1) % cnt); need_redraw = true; }
             }
-        } break;
-        case InputKeyDown: {
+            break;
+        case InputKeyDown:
             if(evt->type == InputTypeShort) {
                 uint8_t cnt = app_get_preset_count(ql->app);
-                if(cnt) ql->idx = (uint8_t)((ql->idx + 1) % cnt);
+                if(cnt) { ql->idx = (uint8_t)((ql->idx + 1) % cnt); need_redraw = true; }
             }
-        } break;
+            break;
+        case InputKeyLeft:
+        case InputKeyRight:
+            // variants pas encore implémentés
+            break;
         case InputKeyOk:
             if(evt->type == InputTypeShort) quicklog_do_log(ql, false);
             if(evt->type == InputTypeLong)  quicklog_do_log(ql, true);
             break;
         case InputKeyBack: {
             ViewDispatcher* vd = app_get_view_dispatcher(ql->app);
-            if(vd) view_dispatcher_switch_to_view(vd, 0 /* main menu */);
+            if(vd) view_dispatcher_switch_to_view(vd, 0);
         } break;
         default: break;
+    }
+
+    if(need_redraw) {
+        ViewDispatcher* vd = app_get_view_dispatcher(ql->app);
+        if(vd) view_dispatcher_switch_to_view(vd, ql->view_id);
     }
     return true;
 }
 
 void quicklog_start(App* app) {
-    QuickLog* ql = (QuickLog*)malloc(sizeof(QuickLog));
+    QuickLog* ql = malloc(sizeof(QuickLog));
     memset(ql, 0, sizeof(QuickLog));
     ql->app = app;
 
@@ -126,7 +132,7 @@ void quicklog_start(App* app) {
     view_set_input_callback(view, quicklog_input);
 
     ViewDispatcher* vd = app_get_view_dispatcher(app);
-    const uint32_t kQuickViewId = 7;
-    view_dispatcher_add_view(vd, kQuickViewId, view);
-    view_dispatcher_switch_to_view(vd, kQuickViewId);
+    ql->view_id = 7;
+    view_dispatcher_add_view(vd, ql->view_id, view);
+    view_dispatcher_switch_to_view(vd, ql->view_id);
 }
