@@ -1,55 +1,48 @@
+// app.c — main app wiring (UART removed for now to avoid missing header; can add later)
 #include <furi.h>
-#include <furi_hal.h>
 #include <gui/gui.h>
 #include <gui/view_dispatcher.h>
 #include <gui/modules/submenu.h>
-#include <input/input.h>
-#include <storage/storage.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-#include "app.h"
-#include "nmea.h"
-#include "storage_helpers.h"
-#include "quick_log.h"
+// Prototypes
+void nmea_parse_line(const char* line, bool* has_fix, float* lat, float* lon, float* hdop, uint8_t* sats);
+void storage_write_all_formats(float lat, float lon, float hdop, uint8_t sats,
+                               const char* k, const char* v, const char* note);
 
-#define UART_BAUD 9600
-#define UART_BUFF 128
+// QuickLog
+void quicklog_start(struct App* app);
 
-enum {
-    ViewIdMainMenu = 0,
-};
+enum { ViewIdMainMenu = 0, };
 
-struct App {
+typedef struct App {
     Gui* gui;
     ViewDispatcher* dispatcher;
     Submenu* submenu;
-
     bool has_fix;
     double lat, lon;
     float hdop;
     uint8_t sats;
-};
-
-static void app_uart_init(void) {
-    furi_hal_uart_init(FuriHalUartIdUSART1, UART_BAUD);
-}
+} App;
 
 static void app_uart_poll(App* app) {
     (void)app;
-    // Ici, on pourrait lire du NMEA et mettre à jour has_fix/lat/lon/hdop/sats.
-    // (Le parseur minimal n'est pas branché pour cette démo.)
+    // TODO: lire les lignes NMEA via une source (UART ou fichier)
 }
 
-static void enter_classic_cb(void* ctx) {
-    App* app = ctx;
-    UNUSED(app);
-    // Stub: dans la V1, on pouvait déclencher une capture directe
-    // Ici on ne fait rien (à implémenter selon ton mode classique).
+static void enter_classic_cb(void* ctx, uint32_t index) {
+    (void)index;
+    App* app = (App*)ctx;
+    (void)app;
+    // TODO
 }
 
-static void enter_quicklog_cb(void* ctx) {
-    App* app = ctx;
+static void enter_quicklog_cb(void* ctx, uint32_t index) {
+    (void)index;
+    App* app = (App*)ctx;
     quicklog_start(app);
 }
 
@@ -63,7 +56,7 @@ void app_show_main_menu(App* app) {
     view_dispatcher_switch_to_view(app->dispatcher, ViewIdMainMenu);
 }
 
-/* ====== API exposées pour quick_log ====== */
+/* ====== Interfaces exposées pour quick_log ====== */
 bool app_get_fix(App* app, double* lat, double* lon, float* hdop, uint8_t* sats) {
     if(lat) *lat = app->lat;
     if(lon) *lon = app->lon;
@@ -73,7 +66,7 @@ bool app_get_fix(App* app, double* lat, double* lon, float* hdop, uint8_t* sats)
 }
 
 static const char* k_presets[] = {"bench","waste_basket","drinking_water","toilets"};
-uint8_t app_get_preset_count(App* app){ (void)app; return sizeof(k_presets)/sizeof(k_presets[0]); }
+uint8_t app_get_preset_count(App* app){ (void)app; return (uint8_t)(sizeof(k_presets)/sizeof(k_presets[0])); }
 const char* app_get_preset_key(App* app, uint8_t idx){ (void)app; return k_presets[idx % app_get_preset_count(app)]; }
 const char* app_get_preset_variant(App* app, uint8_t idx, uint8_t* has_variant){ (void)app;(void)idx; if(has_variant) *has_variant=0; return ""; }
 
@@ -81,30 +74,26 @@ ViewDispatcher* app_get_view_dispatcher(App* app){ return app->dispatcher; }
 
 bool app_save_point(App* app, const char* key, const char* variant, const char* note,
                     double lat, double lon, float hdop, uint8_t sats, const char* quality) {
-    (void)variant; (void)quality;
+    (void)variant; (void)quality; (void)app;
     storage_write_all_formats((float)lat, (float)lon, hdop, sats, "amenity", key, note?note:"");
     return true;
 }
 
 /* ====== Entrée principale ====== */
 int32_t app(void* p) {
-    UNUSED(p);
-    App* app = malloc(sizeof(App));
+    (void)p;
+    App* app = (App*)malloc(sizeof(App));
     memset(app, 0, sizeof(App));
 
     app->gui = furi_record_open(RECORD_GUI);
     app->dispatcher = view_dispatcher_alloc();
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
 
-    app_uart_init();
     app_show_main_menu(app);
 
-    // Boucle simple (poll UART si besoin)
     while(1) {
         app_uart_poll(app);
         furi_delay_ms(50);
     }
-
-    // Jamais atteint dans ce squelette
     return 0;
 }
