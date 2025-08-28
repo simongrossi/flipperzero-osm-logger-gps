@@ -1,4 +1,3 @@
-// app.c — main app wiring (UART omitted for now)
 #include <furi.h>
 #include <gui/gui.h>
 #include <gui/view_dispatcher.h>
@@ -8,14 +7,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct App App; // forward typedef for cross-module prototypes
+typedef struct App App;
 
-// Prototypes
-void nmea_parse_line(const char* line, bool* has_fix, float* lat, float* lon, float* hdop, uint8_t* sats);
 void storage_write_all_formats(float lat, float lon, float hdop, uint8_t sats,
                                const char* k, const char* v, const char* note);
 
-// QuickLog
 void quicklog_start(App* app);
 
 enum { ViewIdMainMenu = 0, };
@@ -29,11 +25,6 @@ struct App {
     float hdop;
     uint8_t sats;
 };
-
-static void app_uart_poll(App* app) {
-    (void)app;
-    // TODO: lire les lignes NMEA via une source (UART ou fichier)
-}
 
 static void enter_classic_cb(void* ctx, uint32_t index) {
     (void)index;
@@ -58,7 +49,7 @@ void app_show_main_menu(App* app) {
     view_dispatcher_switch_to_view(app->dispatcher, ViewIdMainMenu);
 }
 
-/* ====== Interfaces exposées pour quick_log ====== */
+// ==== Interfaces pour quick_log ====
 bool app_get_fix(App* app, double* lat, double* lon, float* hdop, uint8_t* sats) {
     if(lat) *lat = app->lat;
     if(lon) *lon = app->lon;
@@ -81,7 +72,6 @@ bool app_save_point(App* app, const char* key, const char* variant, const char* 
     return true;
 }
 
-/* ====== Entrée principale ====== */
 int32_t app(void* p) {
     (void)p;
     App* app = (App*)malloc(sizeof(App));
@@ -94,7 +84,6 @@ int32_t app(void* p) {
     app_show_main_menu(app);
 
     while(1) {
-        app_uart_poll(app);
         furi_delay_ms(50);
     }
     return 0;
