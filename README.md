@@ -16,6 +16,9 @@
   - `points.gpx` (waypoints)
   - `points.geojson` (Features simplifiées)
 - Script d’exemple pour convertir `JSONL → GeoJSON` propre
+- **Mode Rapide** : carrousel de presets (↑/↓), log immédiat avec OK, 
+  forcer malgré un HDOP élevé ou ajouter une note courte avec un appui long.
+
 
 > ⚠️ **Alpha** : code minimal, GPX/GeoJSON en *append naïf* (voir TODO pour headers/footers propres).
 
@@ -62,7 +65,21 @@
    - `/ext/apps_data/osm_logger/points.geojson`  
 
 ---
+### Mode Rapide
+1. Menu principal → `Mode rapide`
+2. Utiliser les touches selon ce schéma :
 
+| Touche     | Action                                               |
+|------------|------------------------------------------------------|
+| ↑ / ↓      | Changer de preset                                    |
+| ← / →      | Changer de variant (si disponible)                   |
+| OK         | Enregistrement immédiat (si fix OK et HDOP ≤ 2.5*)   |
+| OK long    | Forcer l’enregistrement ou saisir une note courte    |
+| BACK       | Retour au menu principal                             |
+
+\* Valeur par défaut configurable (2.5).
+
+---
 ## 🗂️ Formats
 
 ### JSONL
@@ -114,6 +131,9 @@ Les presets peuvent être recompilés en dur ou chargés depuis `presets.json` (
 - [ ] Support autres modules GPS (PA1010D, etc.)  
 - [ ] Export direct vers Notes OSM via API  
 - [ ] UI améliorée (icônes, preview)  
+- [ ] Améliorer l’UI du Mode Rapide (toasts, vibration, feedback visuel)
+- [ ] Support d’un éditeur de note plus long (pas seulement 12 caractères)
+- [ ] Intégration des variantes de presets
 
 ---
 
