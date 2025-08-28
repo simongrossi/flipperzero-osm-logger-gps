@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <notification/notification.h>
+#include <notification/notification_messages.h>
 
 typedef struct App App;  // forward-declare
 
@@ -74,9 +76,21 @@ static void quicklog_do_log(QuickLog* ql, bool force_or_note) {
     if(!valid && !force_or_note) { ql->last_log_tick = now; return; }
     if(valid && (hdop > 2.5f) && !force_or_note) { ql->last_log_tick = now; return; }
 
-    char note[13] = {0};
+    char note[13] = {0}; // Note: la taille est en dur ici, voir point suivant
     bool ok = app_save_point(ql->app, key, variant, note, lat, lon, hdop, sats, quality);
-    (void)ok;
+    
+    // --- DÉBUT DE LA MODIFICATION ---
+    NotificationApp* notifications = furi_record_open(RECORD_NOTIFICATION);
+    if(ok) {
+        // Vibration courte pour succès
+        notification_message(notifications, &sequence_success);
+    } else {
+        // Vibration plus longue pour erreur (si la sauvegarde échoue)
+        notification_message(notifications, &sequence_error);
+    }
+    furi_record_close(RECORD_NOTIFICATION);
+    // --- FIN DE LA MODIFICATION ---
+
     ql->last_log_tick = now;
 }
 
