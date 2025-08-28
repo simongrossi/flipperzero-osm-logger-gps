@@ -1,4 +1,4 @@
-// app.c — main app wiring (UART removed for now to avoid missing header; can add later)
+// app.c — main app wiring (UART omitted for now)
 #include <furi.h>
 #include <gui/gui.h>
 #include <gui/view_dispatcher.h>
@@ -8,17 +8,19 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+typedef struct App App; // forward typedef for cross-module prototypes
+
 // Prototypes
 void nmea_parse_line(const char* line, bool* has_fix, float* lat, float* lon, float* hdop, uint8_t* sats);
 void storage_write_all_formats(float lat, float lon, float hdop, uint8_t sats,
                                const char* k, const char* v, const char* note);
 
 // QuickLog
-void quicklog_start(struct App* app);
+void quicklog_start(App* app);
 
 enum { ViewIdMainMenu = 0, };
 
-typedef struct App {
+struct App {
     Gui* gui;
     ViewDispatcher* dispatcher;
     Submenu* submenu;
@@ -26,7 +28,7 @@ typedef struct App {
     double lat, lon;
     float hdop;
     uint8_t sats;
-} App;
+};
 
 static void app_uart_poll(App* app) {
     (void)app;
