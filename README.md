@@ -4,8 +4,6 @@
 > choisir un type de point (banc, poubelle, fontaine…), ajouter une note courte,  
 > et sauvegarder sur microSD en **JSONL**, **CSV (notes)**, **GPX**, **GeoJSON**.
 
-![Flipper Zero + GPS](docs/hero.jpg)
-
 ---
 
 ## ✨ Fonctionnalités
