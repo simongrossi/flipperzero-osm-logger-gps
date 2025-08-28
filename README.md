@@ -17,8 +17,7 @@
   - `points.geojson` (Features simplifiées)
 - Script d’exemple pour convertir `JSONL → GeoJSON` propre
 - **Mode Rapide** : carrousel de presets (↑/↓), log immédiat avec OK, 
-  forcer malgré un HDOP élevé ou ajouter une note courte avec un appui long.
-
+  appui long = forcer malgré un HDOP élevé ou saisir une note courte.
 
 > ⚠️ **Alpha** : code minimal, GPX/GeoJSON en *append naïf* (voir TODO pour headers/footers propres).
 
@@ -42,8 +41,7 @@
 1. Installer le **Flipper SDK** (`fbt`).
 2. Cloner ce repo dans l’arborescence du SDK, dossier `applications_user/` :
    ```bash
-   git clone https://github.com/<votre_compte>/flipperzero-osm-logger-gps \
-       $FLIPPER_SDK/applications_user/flipperzero-osm-logger-gps
+   git clone https://github.com/simongrossi/flipperzero-osm-logger-gps        $FLIPPER_SDK/applications_user/flipperzero-osm-logger-gps
    ```
 3. Compiler :
    ```bash
@@ -65,21 +63,21 @@
    - `/ext/apps_data/osm_logger/points.geojson`  
 
 ---
+
 ### Mode Rapide
 1. Menu principal → `Mode rapide`
 2. Utiliser les touches selon ce schéma :
 
-| Touche     | Action                                               |
-|------------|------------------------------------------------------|
-| ↑ / ↓      | Changer de preset                                    |
-| ← / →      | Changer de variant (si disponible)                   |
-| OK         | Enregistrement immédiat (si fix OK et HDOP ≤ 2.5*)   |
-| OK long    | Forcer l’enregistrement ou saisir une note courte    |
-| BACK       | Retour au menu principal                             |
-
-\* Valeur par défaut configurable (2.5).
+| Touche     | Action                                                          |
+|------------|-----------------------------------------------------------------|
+| ↑ / ↓      | Changer de preset                                               |
+| ← / →      | Changer de variant (si disponible)                              |
+| OK         | Enregistrement immédiat (si fix OK et HDOP ≤ 2.5 par défaut)    |
+| OK long    | Forcer l’enregistrement malgré précision faible ou ajouter note |
+| BACK       | Retour au menu principal                                        |
 
 ---
+
 ## 🗂️ Formats
 
 ### JSONL
@@ -127,42 +125,15 @@ Les presets peuvent être recompilés en dur ou chargés depuis `presets.json` (
 
 ## ✅ Roadmap
 - [ ] Headers/footers corrects pour GPX/GeoJSON  
-- [ ] Choix fréquence log (auto vs manuel)  
+- [ ] Choix fréquence log (auto vs manuel, mode trace GPX)  
 - [ ] Support autres modules GPS (PA1010D, etc.)  
 - [ ] Export direct vers Notes OSM via API  
 - [ ] UI améliorée (icônes, preview)  
-- [ ] Améliorer l’UI du Mode Rapide (toasts, vibration, feedback visuel)
-- [ ] Support d’un éditeur de note plus long (pas seulement 12 caractères)
-- [ ] Intégration des variantes de presets
+- [ ] Améliorer l’UI du Mode Rapide (toasts, vibration, feedback visuel)  
+- [ ] Support d’un éditeur de note plus long (pas seulement 12 caractères)  
+- [ ] Intégration des variantes de presets  
 
 ---
 
 ## 🖊️ Licence
 MIT — voir [LICENSE](LICENSE).
-
----
-
-## 📄 LICENSE (MIT)
-```text
-MIT License
-
-Copyright (c) 2025 Simon
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
