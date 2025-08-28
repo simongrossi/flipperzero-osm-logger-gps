@@ -1,6 +1,6 @@
-// storage.c — JSONL + CSV (SDK 1.3.x): append via seek, RTC DateTime
+// storage.c — JSONL + CSV (SDK >1.3.x): append via FSOM_OPEN_APPEND
 #include <furi.h>
-#include <furi_hal_rtc.h>          // <-- header RTC correct (DateTime)
+#include <furi_hal_rtc.h>
 #include <storage/storage.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,28 +16,23 @@ static void ensure_dir(Storage* s) {
     }
 }
 
-// Append "à la main": open write, seek end, write, newline, close
 static bool append_line(Storage* s, const char* path, const char* line) {
-    bool ok = false;
     File* f = storage_file_alloc(s);
     if(!f) return false;
 
-    // SDK 1.3.x: 3 params (no open_mode)
-    if(storage_file_open(f, path, FSAM_WRITE)) {
-        // Aller en fin de fichier: 2 façons selon SDK;
-        // celle-ci (avec 'from_end=true') est supportée en 1.3.x:
-        storage_file_seek(f, 0, true);
-        // Ecrire la ligne + \n
-        storage_file_write(f, line, strlen(line));
-        storage_file_write(f, "\n", 1);
-        storage_file_close(f);
-        ok = true;
+    if(!storage_file_open(f, path, FSAM_WRITE, FSOM_OPEN_APPEND)) {
+        storage_file_free(f);
+        return false;
     }
+    
+    storage_file_write(f, line, strlen(line));
+    storage_file_write(f, "\n", 1);
+    
+    storage_file_close(f);
     storage_file_free(f);
-    return ok;
+    return true;
 }
 
-// Remplace les " par ' pour ne pas casser JSON/CSV minimal
 static void sanitize_quotes(char* s) {
     if(!s) return;
     for(char* p = s; *p; ++p) if(*p == '\"') *p = '\'';
@@ -49,15 +44,14 @@ void storage_write_all_formats(float lat, float lon, float hdop, uint8_t sats,
     if(!s) return;
     ensure_dir(s);
 
-    // Horodatage ISO depuis le RTC
     DateTime dt;
     furi_hal_rtc_get_datetime(&dt);
-    char ts[21]; // "YYYY-MM-DDTHH:MM:SSZ"
+    // --- CORRECTION 1 : Buffer du timestamp augmenté ---
+    char ts[32]; // "YYYY-MM-DDTHH:MM:SSZ" + marge de sécurité
     snprintf(ts, sizeof(ts), "%04u-%02u-%02uT%02u:%02u:%02uZ",
              (unsigned)dt.year, (unsigned)dt.month, (unsigned)dt.day,
              (unsigned)dt.hour, (unsigned)dt.minute, (unsigned)dt.second);
 
-    // Buffers modifiables pour sanitization
     char key_buf[64] = {0};
     char val_buf[64] = {0};
     char note_buf[160] = {0};
@@ -68,8 +62,8 @@ void storage_write_all_formats(float lat, float lon, float hdop, uint8_t sats,
     sanitize_quotes(val_buf);
     sanitize_quotes(note_buf);
 
-    // JSONL (source de vérité)
-    char jsonl[320];
+    // --- CORRECTION 2 : Buffers JSONL et CSV augmentés ---
+    char jsonl[512];
     snprintf(
         jsonl, sizeof(jsonl),
         "{\"ts\":\"%s\",\"lat\":%.6f,\"lon\":%.6f,"
@@ -82,8 +76,7 @@ void storage_write_all_formats(float lat, float lon, float hdop, uint8_t sats,
     );
     append_line(s, "/ext/apps_data/osm_logger/points.jsonl", jsonl);
 
-    // CSV de notes
-    char csv[320];
+    char csv[512];
     snprintf(
         csv, sizeof(csv),
         "%s,%.6f,%.6f,\"%s=%s | %s\"",
@@ -92,6 +85,5 @@ void storage_write_all_formats(float lat, float lon, float hdop, uint8_t sats,
     );
     append_line(s, "/ext/apps_data/osm_logger/notes.csv", csv);
 
-    // Pas de GPX/GeoJSON ici (conversion offline)
     furi_record_close(RECORD_STORAGE);
 }
