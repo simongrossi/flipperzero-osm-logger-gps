@@ -1,3 +1,4 @@
+// app.c — main app with proper dispatcher run + SDK 1.3.x navigation callback
 #include <furi.h>
 #include <gui/gui.h>
 #include <gui/view_dispatcher.h>
@@ -11,7 +12,6 @@ typedef struct App App;
 
 void storage_write_all_formats(float lat, float lon, float hdop, uint8_t sats,
                                const char* k, const char* v, const char* note);
-
 void quicklog_start(App* app);
 
 enum { ViewIdMainMenu = 0, };
@@ -26,11 +26,23 @@ struct App {
     uint8_t sats;
 };
 
+/* ===== Navigation (Back) =====
+ * For SDK 1.3.x, view_dispatcher_set_navigation_event_callback takes a callback
+ * with signature: bool (*)(void* ctx). It is called on Back events.
+ */
+static bool app_nav_callback(void* ctx) {
+    App* app = (App*)ctx;
+    // Quitter proprement l'application (sort de view_dispatcher_run)
+    view_dispatcher_stop(app->dispatcher);
+    return true; // évènement consommé
+}
+
+/* ====== Submenu callbacks ====== */
 static void enter_classic_cb(void* ctx, uint32_t index) {
     (void)index;
     App* app = (App*)ctx;
+    // TODO: implémenter le mode "classique"
     (void)app;
-    // TODO
 }
 
 static void enter_quicklog_cb(void* ctx, uint32_t index) {
@@ -49,7 +61,7 @@ void app_show_main_menu(App* app) {
     view_dispatcher_switch_to_view(app->dispatcher, ViewIdMainMenu);
 }
 
-// ==== Interfaces pour quick_log ====
+/* ====== Interfaces exposées pour quick_log ====== */
 bool app_get_fix(App* app, double* lat, double* lon, float* hdop, uint8_t* sats) {
     if(lat) *lat = app->lat;
     if(lon) *lon = app->lon;
@@ -72,6 +84,7 @@ bool app_save_point(App* app, const char* key, const char* variant, const char* 
     return true;
 }
 
+/* ====== Entrée principale ====== */
 int32_t app(void* p) {
     (void)p;
     App* app = (App*)malloc(sizeof(App));
@@ -79,12 +92,23 @@ int32_t app(void* p) {
 
     app->gui = furi_record_open(RECORD_GUI);
     app->dispatcher = view_dispatcher_alloc();
+
+    // Attache GUI + contexte et callback navigation (SDK 1.3.x)
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
+    view_dispatcher_set_event_callback_context(app->dispatcher, app);
+    view_dispatcher_set_navigation_event_callback(app->dispatcher, app_nav_callback);
 
     app_show_main_menu(app);
 
-    while(1) {
-        furi_delay_ms(50);
-    }
+    // Boucle évènementielle (bloquante) — stop via app_nav_callback()
+    view_dispatcher_run(app->dispatcher);
+
+    // Nettoyage
+    view_dispatcher_remove_view(app->dispatcher, ViewIdMainMenu);
+    submenu_free(app->submenu);
+    view_dispatcher_free(app->dispatcher);
+    furi_record_close(RECORD_GUI);
+    free(app);
+
     return 0;
 }
