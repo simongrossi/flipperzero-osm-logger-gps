@@ -1,3 +1,4 @@
+
 #include <furi.h>
 #include <gui/canvas.h>
 #include <gui/view_dispatcher.h>
@@ -114,6 +115,7 @@ static bool quicklog_input(InputEvent* evt, void* ctx) {
     }
 
     if(need_redraw) {
+        // Forcer un redraw en revenant sur la même vue
         ViewDispatcher* vd = app_get_view_dispatcher(ql->app);
         if(vd) view_dispatcher_switch_to_view(vd, ql->view_id);
     }
@@ -121,7 +123,7 @@ static bool quicklog_input(InputEvent* evt, void* ctx) {
 }
 
 void quicklog_start(App* app) {
-    QuickLog* ql = malloc(sizeof(QuickLog));
+    QuickLog* ql = (QuickLog*)malloc(sizeof(QuickLog));
     memset(ql, 0, sizeof(QuickLog));
     ql->app = app;
 
