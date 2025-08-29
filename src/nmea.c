@@ -1,83 +1,172 @@
-// nmea.c — minimal RMC/GGA parser (parameters used to avoid -Werror)
+// nmea.c — minimal RMC/GGA parser without atof/strtok_r (Flipper-safe)
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 
-static float nmea_coord_to_dec(const char* s, bool is_lat) {
-    if(!s || !*s) return 0.f;
-    int deg_len = is_lat ? 2 : 3;
-    char degbuf[4] = {0};
-    strncpy(degbuf, s, deg_len);
-    int deg = atoi(degbuf);
-    float min = (float)atof(s + deg_len);
-    return (float)deg + (min / 60.0f);
+static float parse_float_simple(const char* s, size_t n) {
+    // Parses a simple decimal with optional leading sign and dot (no exponent)
+    if(!s || n == 0) return 0.0f;
+    size_t i = 0;
+    int sign = 1;
+    if(s[i] == '+') { i++; }
+    else if(s[i] == '-') { sign = -1; i++; }
+
+    uint32_t ip = 0;
+    while(i < n) {
+        char c = s[i];
+        if(c >= '0' && c <= '9') {
+            ip = ip * 10u + (uint32_t)(c - '0');
+            i++;
+        } else {
+            break;
+        }
+    }
+
+    float val = (float)ip;
+    if(i < n && s[i] == '.') {
+        i++;
+        float base = 0.1f;
+        while(i < n) {
+            char c = s[i];
+            if(c >= '0' && c <= '9') {
+                val += base * (float)(c - '0');
+                base *= 0.1f;
+                i++;
+            } else {
+                break;
+            }
+        }
+    }
+    return (float)sign * val;
 }
 
-static const char* field_at(const char* line, int index, char* out, size_t out_sz) {
-    if(!line) return NULL;
-    const char* p = line;
-    int commas = 0;
-    const char* first_comma = strchr(p, ',');
-    if(!first_comma) return NULL;
-    p = first_comma + 1;
-
-    while(commas < index && (p = strchr(p, ','))) {
-        ++commas; ++p;
+static float nmea_degmin_to_deg_str(const char* s, size_t n) {
+    // Convert numeric string DDMM.mmmm or DDDMM.mmmm to decimal degrees
+    if(!s || n == 0) return 0.0f;
+    // find dot to separate minutes precision
+    size_t dot = 0;
+    for(size_t i = 0; i < n; i++) {
+        if(s[i] == '.') { dot = i; break; }
     }
-    if(commas != index || !p) return NULL;
-
-    const char* q = strchr(p, ',');
-    size_t len = (q ? (size_t)(q - p) : strlen(p));
-    if(out && out_sz) {
-        if(len >= out_sz) len = out_sz - 1;
-        memcpy(out, p, len);
-        out[len] = '\0';
-        return out;
+    if(dot == 0) {
+        // no dot found or dot at 0; fallback: parse as degrees directly
+        return parse_float_simple(s, n);
     }
-    return NULL;
+    // number of digits before dot (could include at least 4 or 5)
+    size_t int_digits = dot;
+    if(int_digits < 3) {
+        return parse_float_simple(s, n);
+    }
+    // dd or ddd are degrees, the last two digits before dot belong to minutes
+    // robust split: dd = floor(full/100), mm = full - dd*100
+    float full = parse_float_simple(s, n);
+    int dd = (int)(full / 100.0f);
+    float mm = full - (float)(dd * 100);
+    return (float)dd + (mm / 60.0f);
+}
+
+typedef struct {
+    const char* p;
+    size_t len;
+} Slice;
+
+static int split_csv_fields(const char* line, Slice* out, int max_fields) {
+    int nf = 0;
+    const char* s = line;
+    const char* field_start = s;
+    while(*s) {
+        if(*s == ',' || *s == '\r' || *s == '\n') {
+            if(nf < max_fields) {
+                out[nf].p = field_start;
+                out[nf].len = (size_t)(s - field_start);
+                nf++;
+            }
+            if(*s == ',') {
+                s++;
+                field_start = s;
+                continue;
+            } else {
+                // end of line
+                break;
+            }
+        } else {
+            s++;
+        }
+    }
+    // last field if line doesn't end with comma or newline
+    if(field_start && *field_start && nf < max_fields) {
+        const char* end = s;
+        if(end > field_start) {
+            out[nf].p = field_start;
+            out[nf].len = (size_t)(end - field_start);
+            nf++;
+        }
+    }
+    return nf;
+}
+
+static bool starts_with(const char* s, const char* prefix) {
+    while(*prefix && *s) {
+        if(*s++ != *prefix++) return false;
+    }
+    return *prefix == '\0';
 }
 
 void nmea_parse_line(const char* line, bool* has_fix, float* lat, float* lon, float* hdop, uint8_t* sats) {
-    if(has_fix) *has_fix = false;
-    if(lat) *lat = 0.f;
-    if(lon) *lon = 0.f;
-    if(hdop) *hdop = 99.9f;
-    if(sats) *sats = 0;
-    if(!line || line[0] != '$') return;
+    if(!line) return;
 
-    const char* type = line + 3; // after "$GP"
-    if(strncmp(type, "RMC", 3) == 0) {
-        char buf[16];
-        if(field_at(line, 1, buf, sizeof buf)) {
-            if(has_fix) *has_fix = (buf[0] == 'A');
+    if(has_fix) *has_fix = false;
+
+    Slice f[20];
+    int nf = split_csv_fields(line, f, 20);
+    if(nf < 1) return;
+
+    if(starts_with(line, "$GPRMC") || starts_with(line, "$GNRMC")) {
+        // RMC: 0:$GPRMC,1:time,2:status(A/V),3:lat,4:N/S,5:lon,6:E/W
+        if(nf >= 7) {
+            bool active = (f[2].len == 1 && (f[2].p[0] == 'A' || f[2].p[0] == 'a'));
+            float latv = 0.0f;
+            float lonv = 0.0f;
+            if(active) {
+                if(f[3].len) {
+                    latv = nmea_degmin_to_deg_str(f[3].p, f[3].len);
+                    if(f[4].len == 1 && (f[4].p[0] == 'S' || f[4].p[0] == 's')) latv = -latv;
+                }
+                if(f[5].len) {
+                    lonv = nmea_degmin_to_deg_str(f[5].p, f[5].len);
+                    if(f[6].len == 1 && (f[6].p[0] == 'W' || f[6].p[0] == 'w')) lonv = -lonv;
+                }
+            }
+            if(has_fix) *has_fix = active;
+            if(lat) *lat = latv;
+            if(lon) *lon = lonv;
         }
-        if(lat && lon) {
-            char lat_s[16]={0}, ns[4]={0}, lon_s[16]={0}, ew[4]={0};
-            if(field_at(line, 2, lat_s, sizeof lat_s) && field_at(line, 3, ns, sizeof ns) &&
-               field_at(line, 4, lon_s, sizeof lon_s) && field_at(line, 5, ew, sizeof ew)) {
-                float _lat = nmea_coord_to_dec(lat_s, true);
-                float _lon = nmea_coord_to_dec(lon_s, false);
-                if(ns[0] == 'S') _lat = -_lat;
-                if(ew[0] == 'W') _lon = -_lon;
-                *lat = _lat; *lon = _lon;
+        return;
+    }
+
+    if(starts_with(line, "$GPGGA") || starts_with(line, "$GNGGA")) {
+        // GGA: 0:$GPGGA,...,6:fix(0/1/2...),7:sats,8:hdop
+        if(nf >= 9) {
+            int quality = 0;
+            if(f[6].len && f[6].p[0] >= '0' && f[6].p[0] <= '8') {
+                quality = (int)(f[6].p[0] - '0');
+            }
+            if(has_fix) *has_fix = (quality > 0);
+
+            if(sats) {
+                uint32_t v = 0;
+                for(size_t i = 0; i < f[7].len; i++) {
+                    char c = f[7].p[i];
+                    if(c >= '0' && c <= '9') v = v * 10u + (uint32_t)(c - '0');
+                    else break;
+                }
+                *sats = (uint8_t)(v & 0xFF);
+            }
+            if(hdop && f[8].len) {
+                *hdop = parse_float_simple(f[8].p, f[8].len);
             }
         }
-    } else if(strncmp(type, "GGA", 3) == 0) {
-        char fix[4]={0}, lat_s[16]={0}, ns[4]={0}, lon_s[16]={0}, ew[4]={0}, sats_s[8]={0}, hdop_s[16]={0};
-        (void)field_at(line, 5, fix, sizeof fix);
-        if(has_fix) *has_fix = (fix[0] == '1' || fix[0] == '2');
-
-        if(field_at(line, 1, lat_s, sizeof lat_s) && field_at(line, 2, ns, sizeof ns) &&
-           field_at(line, 3, lon_s, sizeof lon_s) && field_at(line, 4, ew, sizeof ew)) {
-            float _lat = nmea_coord_to_dec(lat_s, true);
-            float _lon = nmea_coord_to_dec(lon_s, false);
-            if(ns[0] == 'S') _lat = -_lat;
-            if(ew[0] == 'W') _lon = -_lon;
-            if(lat) *lat = _lat;
-            if(lon) *lon = _lon;
-        }
-        if(field_at(line, 6, sats_s, sizeof sats_s) && sats) *sats = (uint8_t)atoi(sats_s);
-        if(field_at(line, 7, hdop_s, sizeof hdop_s) && hdop) *hdop = (float)atof(hdop_s);
+        return;
     }
 }

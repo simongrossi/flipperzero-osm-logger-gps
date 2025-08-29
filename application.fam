@@ -1,17 +1,17 @@
-# For details & more options, see documentation/AppManifests.md in firmware repo
+# application.fam — minimal, ufbt-compatible
 
 App(
-    appid="osm_logger",  # Must be unique
-    name="App osm_logger",  # Displayed in menus
+    appid="osm_logger",
+    name="OSM Logger",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="osm_logger_app",
-    stack_size=2 * 1024,
-    fap_category="Examples",
-    # Optional values
-    # fap_version="0.1",
-    fap_icon="osm_logger.png",  # 10x10 1-bit PNG
-    # fap_description="A simple app",
-    # fap_author="J. Doe",
-    # fap_weburl="https://github.com/user/osm_logger",
-    fap_icon_assets="images",  # Image assets to compile for this application
+    requires=["gui", "storage", "notification"],
+    stack_size=2048,
+    sources=[
+        "src/osm_logger.c",
+        "src/app.c",
+        "src/nmea.c",
+        "src/quick_log.c",
+        "src/storage.c",
+    ],
 )
