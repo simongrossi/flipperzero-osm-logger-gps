@@ -15,6 +15,7 @@
 #define LOG_DEBOUNCE_MS   800
 #define MAX_NOTE_LEN      13
 #define QUICK_LOG_VIEW_ID 7
+#define MAIN_MENU_VIEW_ID 0
 // -------------------
 
 typedef struct App App;  // forward-declare
@@ -33,33 +34,31 @@ typedef struct {
     View* view;
     NotificationApp* notifications;
     uint32_t last_log_tick;
-    uint8_t idx;          // index preset
-    uint32_t view_id;     // ID de la vue (pour refresh)
+    uint8_t idx;
 } QuickLog;
 
-// petit helper pour cleanup
-static void quicklog_stop(QuickLog* ql) {
-    if(!ql) return;
-    ViewDispatcher* vd = app_get_view_dispatcher(ql->app);
-    if(vd) {
-        // revenir au menu AVANT de retirer/libérer la vue
-        view_dispatcher_switch_to_view(vd, 0);
-        view_dispatcher_remove_view(vd, ql->view_id);
-    }
-    if(ql->view) view_free(ql->view);
-    if(ql->notifications) furi_record_close(RECORD_NOTIFICATION);
-    free(ql);
-}
+// --- Forward declarations ---
+static void quicklog_request_redraw(QuickLog* ql);
+static void quicklog_enter(void* context);
+static void quicklog_exit(void* context);
+static uint32_t quicklog_previous_callback(void* context);
 
-static void quicklog_draw(Canvas* canvas, void* ctx) {
-    QuickLog* ql = (QuickLog*)ctx;
+// --- DRAW ---
+static void quicklog_draw(Canvas* canvas, void* context) {
+    QuickLog* ql = (QuickLog*)context;
     canvas_clear(canvas);
-    double lat=0, lon=0; float hdop=99; uint8_t sats=0;
+
+    double lat = 0.0, lon = 0.0;
+    float hdop = 99.0f;
+    uint8_t sats = 0;
     bool valid = false;
-    if(ql->app) valid = app_get_fix(ql->app, &lat, &lon, &hdop, &sats);
+
+    if(ql && ql->app) {
+        valid = app_get_fix(ql->app, &lat, &lon, &hdop, &sats);
+    }
 
     const char* key = app_get_preset_key(ql->app, ql->idx);
-    uint8_t hv=0;
+    uint8_t hv = 0;
     const char* var = app_get_preset_variant(ql->app, ql->idx, &hv);
 
     canvas_set_font(canvas, FontPrimary);
@@ -73,15 +72,16 @@ static void quicklog_draw(Canvas* canvas, void* ctx) {
 
     char line2[96];
     if(hv && var && var[0]) {
-        snprintf(line2, sizeof(line2), "Preset: %s  [%s]", key?key:"--", var);
+        snprintf(line2, sizeof(line2), "Preset: %s  [%s]", key ? key : "--", var);
     } else {
-        snprintf(line2, sizeof(line2), "Preset: %s", key?key:"--");
+        snprintf(line2, sizeof(line2), "Preset: %s", key ? key : "--");
     }
     canvas_draw_str(canvas, 4, 42, line2);
 
     canvas_draw_str(canvas, 4, 58, "OK=Log  OK long=Force  ^v Preset  <> Variant");
 }
 
+// --- LOG ---
 static void quicklog_do_log(QuickLog* ql, bool force_or_note) {
     uint32_t now = furi_get_tick();
     if(now - ql->last_log_tick < LOG_DEBOUNCE_MS) return;
@@ -100,82 +100,106 @@ static void quicklog_do_log(QuickLog* ql, bool force_or_note) {
     char note[MAX_NOTE_LEN] = {0};
     bool ok = app_save_point(ql->app, key, variant, note, lat, lon, hdop, sats, quality);
 
-    // vibration feedback (succès/erreur)
     if(ql->notifications) {
         if(ok)  notification_message(ql->notifications, &sequence_success);
         else    notification_message(ql->notifications, &sequence_error);
     }
-
     ql->last_log_tick = now;
 }
 
-static bool quicklog_input(InputEvent* evt, void* ctx) {
-    QuickLog* ql = (QuickLog*)ctx;
+// --- INPUT ---
+static bool quicklog_input(InputEvent* evt, void* context) {
+    QuickLog* ql = (QuickLog*)context;
     if(evt->type != InputTypeShort && evt->type != InputTypeLong) return false;
+
+    // BACK: laisser le dispatcher appeler previous_callback -> cleanup sûr
+    if(evt->key == InputKeyBack && evt->type == InputTypeShort) {
+        return false;
+    }
 
     bool need_redraw = false;
 
     switch(evt->key) {
-        case InputKeyUp:
+        case InputKeyUp: {
             if(evt->type == InputTypeShort) {
                 uint8_t cnt = app_get_preset_count(ql->app);
                 if(cnt) { ql->idx = (uint8_t)((ql->idx + cnt - 1) % cnt); need_redraw = true; }
             }
-            break;
-        case InputKeyDown:
+        } break;
+        case InputKeyDown: {
             if(evt->type == InputTypeShort) {
                 uint8_t cnt = app_get_preset_count(ql->app);
                 if(cnt) { ql->idx = (uint8_t)((ql->idx + 1) % cnt); need_redraw = true; }
             }
-            break;
-        case InputKeyLeft:
-        case InputKeyRight:
-            // variants pas encore implémentés
-            break;
+        } break;
         case InputKeyOk:
             if(evt->type == InputTypeShort) quicklog_do_log(ql, false);
             if(evt->type == InputTypeLong)  quicklog_do_log(ql, true);
             break;
-        case InputKeyBack:
-            quicklog_stop(ql);
-            return true; // on a géré l’event
-        default:
-            break;
+        default: break;
     }
 
-    if(need_redraw) {
-        // Forcer un redraw en revenant sur la même vue
-        ViewDispatcher* vd = app_get_view_dispatcher(ql->app);
-        if(vd) view_dispatcher_switch_to_view(vd, ql->view_id);
-    }
+    if(need_redraw) quicklog_request_redraw(ql);
     return true;
 }
 
-void quicklog_start(App* app) {
-    // Évite de ré-enregistrer la vue si elle existe déjà
-    static bool s_registered = false;
-    if(s_registered) {
-        ViewDispatcher* vd = app_get_view_dispatcher(app);
-        if(vd) view_dispatcher_switch_to_view(vd, QUICK_LOG_VIEW_ID);
-        return;
-    }
+// --- Lifecycle callbacks ---
+static void quicklog_enter(void* context) {
+    QuickLog* ql = (QuickLog*)context;
+    ql->notifications = furi_record_open(RECORD_NOTIFICATION);
+}
 
+static void quicklog_exit(void* context) {
+    QuickLog* ql = (QuickLog*)context;
+    if(ql->notifications) {
+        furi_record_close(RECORD_NOTIFICATION);
+        ql->notifications = NULL;
+    }
+}
+
+// --- Previous callback: retourne la vue menu et nettoie proprement ---
+static uint32_t quicklog_previous_callback(void* context) {
+    QuickLog* ql = (QuickLog*)context;
+    ViewDispatcher* vd = app_get_view_dispatcher(ql->app);
+
+    // Démonte la vue de manière ordonnée
+    view_dispatcher_remove_view(vd, QUICK_LOG_VIEW_ID);
+
+    if(ql->notifications) {
+        furi_record_close(RECORD_NOTIFICATION);
+        ql->notifications = NULL;
+    }
+    if(ql->view) {
+        view_free(ql->view);
+        ql->view = NULL;
+    }
+    free(ql);
+
+    return MAIN_MENU_VIEW_ID;
+}
+
+// --- Helper redraw sûr ---
+static void quicklog_request_redraw(QuickLog* ql) {
+    ViewDispatcher* vd = app_get_view_dispatcher(ql->app);
+    view_dispatcher_switch_to_view(vd, QUICK_LOG_VIEW_ID);
+}
+
+// --- START ---
+void quicklog_start(App* app) {
     QuickLog* ql = (QuickLog*)malloc(sizeof(QuickLog));
     memset(ql, 0, sizeof(QuickLog));
     ql->app = app;
-    ql->view_id = QUICK_LOG_VIEW_ID;
-    ql->notifications = furi_record_open(RECORD_NOTIFICATION); // cache le handle
 
-    ql->view = view_alloc();
-    view_set_context(ql->view, ql);
-    view_set_draw_callback(ql->view, quicklog_draw);
-    view_set_input_callback(ql->view, quicklog_input);
+    View* view = view_alloc();
+    ql->view = view; // important pour redraw et cleanup
+    view_set_context(view, ql);
+    view_set_draw_callback(view, quicklog_draw);
+    view_set_input_callback(view, quicklog_input);
+    view_set_enter_callback(view, quicklog_enter);
+    view_set_exit_callback(view, quicklog_exit);
+    view_set_previous_callback(view, quicklog_previous_callback);
 
     ViewDispatcher* vd = app_get_view_dispatcher(app);
-    view_dispatcher_add_view(vd, ql->view_id, ql->view);
-    view_dispatcher_switch_to_view(vd, ql->view_id);
-
-    s_registered = true;
-
-    // NB: on remettra s_registered=false quand on quittera la vue (Back) via quicklog_stop()
+    view_dispatcher_add_view(vd, QUICK_LOG_VIEW_ID, view);
+    view_dispatcher_switch_to_view(vd, QUICK_LOG_VIEW_ID);
 }
