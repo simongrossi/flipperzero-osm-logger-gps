@@ -5,6 +5,7 @@
 #include <input/input.h>
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
+#include <expansion/expansion.h>
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -15,8 +16,12 @@ typedef struct App {
     // UI
     Gui* gui;
     ViewDispatcher* dispatcher;
-    Submenu* menu;
+    Submenu* menu;           // menu principal
+    Submenu* preset_menu;    // liste des presets OSM
     NotificationApp* notification;
+
+    // Expansion service (désactivé le temps qu'on utilise l'UART GPS)
+    Expansion* expansion;
 
     // UART handle
     struct FuriHalSerialHandle* serial;
@@ -26,7 +31,9 @@ typedef struct App {
     float lat;
     float lon;
     float hdop;
+    float altitude;       // mètres au-dessus du geoïde (GGA)
     uint8_t sats;
+    uint32_t last_fix_tick; // furi_get_tick() du dernier fix reçu (0 = jamais)
 
     // Vue Quick Log
     View* quick_view;
@@ -37,11 +44,18 @@ typedef struct App {
 
     // Note rapide optionnelle
     char quick_note[64];
+
+    // Preset courant (index dans PRESETS, défini dans quick_log.c)
+    uint8_t current_preset;
+
+    // Compteur de points sauvegardés depuis le démarrage de l'app
+    uint16_t session_count;
 } App;
 
 typedef enum {
     AppViewMenu = 0,
-    AppViewQuickLog = 1,
+    AppViewPresets = 1,
+    AppViewQuickLog = 2,
 } AppView;
 
 #ifdef __cplusplus

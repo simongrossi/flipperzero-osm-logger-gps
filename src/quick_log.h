@@ -10,6 +10,7 @@ typedef struct App App;
 // API Quick Log (implémentée dans quick_log.c)
 void app_start_quick_log(App* app);
 void app_stop_quick_log(App* app);
+void quick_log_refresh(App* app);
 
 #ifdef __cplusplus
 }

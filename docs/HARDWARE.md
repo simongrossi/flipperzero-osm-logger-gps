@@ -1,0 +1,46 @@
+# Matériel & câblage
+
+## Modules supportés
+
+- **GPS NEO-6M V2** (u-blox NEO-6) — sortie NMEA 0183, 9600 bauds, 1 Hz
+- Antenne céramique (fournie avec le module) ou antenne active externe via U.FL
+
+> D'autres modules NMEA 9600 bauds devraient marcher (PA1010D, BN-180, etc.) mais non testés. Si tu testes avec succès, n'hésite pas à ouvrir une PR.
+
+## Câblage sur Flipper Zero
+
+Le Flipper Zero expose son **USART1** sur les pins 13 (TX) et 14 (RX) du GPIO principal. L'app utilise `FuriHalSerialIdUsart` = USART1.
+
+| NEO-6M | Fil | Flipper GPIO     | Rôle                         |
+|--------|-----|------------------|------------------------------|
+| VCC    | 🔴  | pin 9 (3V3)      | Alim 3,3 V                   |
+| GND    | ⚫  | pin 11 ou 18     | Masse                        |
+| **TX** | 🟢  | **pin 14** (RX)  | NMEA GPS → Flipper           |
+| RX     | 🔵  | pin 13 (TX)      | Optionnel (commandes vers GPS)|
+
+**⚠️ 3,3 V uniquement.** Le NEO-6M accepte 3,3 à 5 V côté alim, mais son TX peut sortir en 5 V si alimenté en 5 V → destruction possible de l'UART Flipper. Alimente-le impérativement en 3,3 V.
+
+> Pinout complet du Flipper : https://docs.flipper.net/gpio-and-modules
+
+## Premier fix
+
+Un GPS froid peut mettre **30 s à 5 min** pour obtenir son premier fix. Pour l'accélérer :
+- Extérieur, vue dégagée du ciel (pas sous arbres, pas derrière vitres doublées, pas à l'ombre d'un bâtiment)
+- Antenne face au ciel
+- Laisser le module alimenté en continu — les éphémérides sont perdues à l'extinction
+
+Après le premier fix en extérieur, le module garde un warm start de quelques minutes.
+
+## Diagnostic : pas de données NMEA
+
+1. **Fils inversés** — le symptôme n°1. Vérifier : TX du GPS → pin 14 Flipper.
+2. **Alim absente** — LED rouge du NEO-6M doit clignoter 1 Hz quand fix OK, et reste allumée sans fix.
+3. **Conflit UART** — sur Momentum/autres firmwares, le service *Expansion* intercepte l'UART. L'app le désactive automatiquement, mais si tu vois du spam `ExpansionSrvWorker` dans les logs, ouvre une issue.
+4. **qFlipper tourne** — il monopolise le port série quand tu fais `ufbt launch`. Ferme-le avec Cmd+Q.
+
+**Voir les trames brutes** via la CLI Flipper :
+```bash
+ufbt cli
+> log debug
+```
+Tu dois voir soit du silence (pas de GPS), soit des logs de parsing périodiques si tu as ajouté des `FURI_LOG_D` dans le code.

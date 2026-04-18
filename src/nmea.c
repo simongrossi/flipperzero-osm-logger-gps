@@ -113,7 +113,14 @@ static bool starts_with(const char* s, const char* prefix) {
     return *prefix == '\0';
 }
 
-void nmea_parse_line(const char* line, bool* has_fix, float* lat, float* lon, float* hdop, uint8_t* sats) {
+void nmea_parse_line(
+    const char* line,
+    bool* has_fix,
+    float* lat,
+    float* lon,
+    float* hdop,
+    uint8_t* sats,
+    float* altitude) {
     if(!line) return;
 
     if(has_fix) *has_fix = false;
@@ -146,7 +153,7 @@ void nmea_parse_line(const char* line, bool* has_fix, float* lat, float* lon, fl
     }
 
     if(starts_with(line, "$GPGGA") || starts_with(line, "$GNGGA")) {
-        // GGA: 0:$GPGGA,...,6:fix(0/1/2...),7:sats,8:hdop
+        // GGA: 0:$GPGGA,...,6:fix,7:sats,8:hdop,9:altitude,10:unit(M)
         if(nf >= 9) {
             int quality = 0;
             if(f[6].len && f[6].p[0] >= '0' && f[6].p[0] <= '8') {
@@ -165,6 +172,9 @@ void nmea_parse_line(const char* line, bool* has_fix, float* lat, float* lon, fl
             }
             if(hdop && f[8].len) {
                 *hdop = parse_float_simple(f[8].p, f[8].len);
+            }
+            if(altitude && nf >= 10 && f[9].len) {
+                *altitude = parse_float_simple(f[9].p, f[9].len);
             }
         }
         return;
