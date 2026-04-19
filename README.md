@@ -41,13 +41,25 @@
 - **NEO-6M V2 GPS** (u-blox NEO-6) — NMEA output at 9600 bauds
 - Ceramic antenna (bundled) or external active antenna
 
-### Wiring (3.3 V only)
+### Wiring (3.3 V, 3 wires)
 
-| NEO-6M | Flipper pin   |
-|--------|---------------|
-| VCC    | 9 (3V3)       |
-| GND    | 11            |
-| TX     | **14** (RX)   |
+```
+  Flipper Zero GPIO                          NEO-6M GPS
+ ┌────┬──────────┐                          ┌──────────┐
+ │  9 │ 3V3      ├──────── 🔴 red ────────▶ │ VCC      │
+ │ 10 │ SWC      │                          │          │
+ │ 11 │ GND      ├──────── ⚫ black ──────▶ │ GND      │
+ │ 12 │ SIO      │                          │          │
+ │ 13 │ TX       │                          │ RX ◁ ── unused (no command sent)
+ │ 14 │ RX       │◀─────── 🟢 green ─────── │ TX       │
+ │ 15 │ C1       │                          └──────────┘
+ │ 16 │ C0       │
+ │ 17 │ 1W       │
+ │ 18 │ GND      │
+ └────┴──────────┘
+```
+
+Only **3 wires** are needed because the app only *reads* NMEA frames from the GPS — never sends commands back.
 
 **⚠️ Use 3.3 V — never 5 V.** See [docs/HARDWARE.md](docs/HARDWARE.md) for details, first-fix tips and troubleshooting.
 

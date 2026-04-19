@@ -11,12 +11,38 @@
 
 Le Flipper Zero expose son **USART1** sur les pins 13 (TX) et 14 (RX) du GPIO principal. L'app utilise `FuriHalSerialIdUsart` = USART1.
 
-| NEO-6M | Fil | Flipper GPIO     | Rôle                         |
-|--------|-----|------------------|------------------------------|
-| VCC    | 🔴  | pin 9 (3V3)      | Alim 3,3 V                   |
-| GND    | ⚫  | pin 11 ou 18     | Masse                        |
-| **TX** | 🟢  | **pin 14** (RX)  | NMEA GPS → Flipper           |
-| RX     | 🔵  | pin 13 (TX)      | Optionnel (commandes vers GPS)|
+### Schéma (3 fils)
+
+```
+  Flipper Zero GPIO                          NEO-6M GPS
+ ┌────┬──────────┐                          ┌──────────┐
+ │  9 │ 3V3      ├──────── 🔴 red ────────▶ │ VCC      │
+ │ 10 │ SWC      │                          │          │
+ │ 11 │ GND      ├──────── ⚫ black ──────▶ │ GND      │
+ │ 12 │ SIO      │                          │          │
+ │ 13 │ TX       │                          │ RX ◁ ── non utilisé (voir note)
+ │ 14 │ RX       │◀─────── 🟢 green ─────── │ TX       │
+ │ 15 │ C1       │                          └──────────┘
+ │ 16 │ C0       │
+ │ 17 │ 1W       │
+ │ 18 │ GND      │
+ └────┴──────────┘
+```
+
+### Tableau récapitulatif
+
+| NEO-6M | Fil | Flipper GPIO     | Rôle                                   |
+|--------|-----|------------------|----------------------------------------|
+| VCC    | 🔴  | pin 9 (3V3)      | Alim 3,3 V                             |
+| GND    | ⚫  | pin 11 (ou 18)   | Masse                                  |
+| **TX** | 🟢  | **pin 14** (RX)  | NMEA GPS → Flipper                     |
+| RX     | —   | —                | **Non utilisé** : on ne lit que le GPS |
+
+### Pourquoi seulement 3 fils ?
+
+L'app ne fait que **lire** les trames NMEA émises par le GPS (1 Hz). Elle ne renvoie jamais de commandes de configuration (ex. `$PMTK...` pour ublox) — le module fonctionne avec ses réglages par défaut. Donc la pin RX du GPS peut rester en l'air.
+
+Si tu veux un jour configurer le module (passer en 10 Hz, désactiver des trames, etc.), tu pourras relier le 4e fil : **pin 13 Flipper (TX) → RX GPS**.
 
 **⚠️ 3,3 V uniquement.** Le NEO-6M accepte 3,3 à 5 V côté alim, mais son TX peut sortir en 5 V si alimenté en 5 V → destruction possible de l'UART Flipper. Alimente-le impérativement en 3,3 V.
 
