@@ -13,6 +13,7 @@
 #include "app.h"
 #include "quick_log.h"
 #include "presets.h"
+#include "notes_cache.h"
 #include "storage_helpers.h"
 
 // Seuil de qualité GPS au-delà duquel on refuse OK court (force = OK long)
@@ -53,7 +54,15 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
         canvas_set_font(canvas, FontSecondary);
         char tag[64];
         preset_build_tag(p, m->variant_idx, tag, sizeof(tag));
-        elements_multiline_text_aligned(canvas, 64, 18, AlignCenter, AlignTop, tag);
+        // Multi-tag : split sur 2 lignes
+        char* sc = strchr(tag, ';');
+        if(sc) {
+            *sc = '\0';
+            elements_multiline_text_aligned(canvas, 64, 16, AlignCenter, AlignTop, tag);
+            elements_multiline_text_aligned(canvas, 64, 24, AlignCenter, AlignTop, sc + 1);
+        } else {
+            elements_multiline_text_aligned(canvas, 64, 18, AlignCenter, AlignTop, tag);
+        }
 
         char line[80];
         if(m->has_fix) {
@@ -98,11 +107,19 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
         elements_multiline_text_aligned(canvas, 64, 2, AlignCenter, AlignTop, p->label);
     }
 
-    // Tag OSM effectif (variantes simples OU tags additionnels)
+    // Tag OSM effectif — split sur 2 lignes si multi-tag (contient ';'),
+    // pour éviter le wrap automatique qui superpose avec les lignes en dessous.
     char tag[64];
     preset_build_tag(p, m->variant_idx, tag, sizeof(tag));
     canvas_set_font(canvas, FontSecondary);
-    elements_multiline_text_aligned(canvas, 64, 16, AlignCenter, AlignTop, tag);
+    char* semicolon = strchr(tag, ';');
+    if(semicolon) {
+        *semicolon = '\0';
+        elements_multiline_text_aligned(canvas, 64, 14, AlignCenter, AlignTop, tag);
+        elements_multiline_text_aligned(canvas, 64, 22, AlignCenter, AlignTop, semicolon + 1);
+    } else {
+        elements_multiline_text_aligned(canvas, 64, 16, AlignCenter, AlignTop, tag);
+    }
 
     // Coords + sats
     char line1[48];
@@ -120,8 +137,13 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
         snprintf(line1, sizeof(line1), "No GPS fix");
         snprintf(line2, sizeof(line2), "sats=%u  #%u", m->sats, m->session_count);
     }
-    elements_multiline_text_aligned(canvas, 64, 28, AlignCenter, AlignTop, line1);
-    elements_multiline_text_aligned(canvas, 64, 38, AlignCenter, AlignTop, line2);
+    // Décale coords/hdop d'une ligne vers le bas si on a 2 lignes de tag
+    uint8_t y_coords = semicolon ? 30 : 28;
+    uint8_t y_hdop = semicolon ? 40 : 38;
+    uint8_t y_alt = semicolon ? 50 : 48;
+
+    elements_multiline_text_aligned(canvas, 64, y_coords, AlignCenter, AlignTop, line1);
+    elements_multiline_text_aligned(canvas, 64, y_hdop, AlignCenter, AlignTop, line2);
 
     // Ligne altitude + age du fix + total
     char line3[56];
@@ -136,7 +158,7 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     } else {
         snprintf(line3, sizeof(line3), "alt=-- fix=--  t=%lu", (unsigned long)m->total_count);
     }
-    elements_multiline_text_aligned(canvas, 64, 48, AlignCenter, AlignTop, line3);
+    elements_multiline_text_aligned(canvas, 64, y_alt, AlignCenter, AlignTop, line3);
 
     // Footer : si note non-vide l'afficher, sinon rappel touches
     if(m->note[0]) {
@@ -162,9 +184,34 @@ static bool quick_log_do_save(App* app, bool force) {
 
     char tag[64];
     preset_build_tag(p, app->current_variant, tag, sizeof(tag));
-    const char* note = app->quick_note[0] ? app->quick_note : NULL;
+
+    // Construit la note finale : note utilisateur, avec éventuellement "photo:N" append
+    char final_note[128];
+    final_note[0] = '\0';
+    if(app->settings.auto_photo_id) {
+        uint32_t photo_id = app->total_count + 1;
+        if(app->quick_note[0]) {
+            snprintf(
+                final_note, sizeof(final_note), "%s photo:%lu",
+                app->quick_note, (unsigned long)photo_id);
+        } else {
+            snprintf(final_note, sizeof(final_note), "photo:%lu", (unsigned long)photo_id);
+        }
+    } else if(app->quick_note[0]) {
+        strncpy(final_note, app->quick_note, sizeof(final_note) - 1);
+        final_note[sizeof(final_note) - 1] = '\0';
+    }
+    const char* note = final_note[0] ? final_note : NULL;
+
     storage_write_all_formats(
         app->lat, app->lon, app->altitude, app->hdop, app->sats, tag, note);
+
+    // Persiste la note utilisateur (pas le photo:N, qui est auto) dans le cache
+    // pour ce preset.
+    char primary[48];
+    preset_build_primary_tag(p, primary, sizeof(primary));
+    notes_cache_save(primary, app->quick_note);
+
     app->session_count++;
     app->total_count++;
     notification_message(app->notification, &sequence_success);
@@ -253,6 +300,15 @@ static uint32_t quick_log_previous_callback(void* ctx) {
 
 static void quick_log_enter(void* ctx) {
     App* app = (App*)ctx;
+
+    // Recharge la note du cache associée au preset courant (si existe)
+    const Preset* p = presets_get(app->current_preset);
+    if(p) {
+        char primary[48];
+        preset_build_primary_tag(p, primary, sizeof(primary));
+        notes_cache_load(primary, app->quick_note, sizeof(app->quick_note));
+    }
+
     quick_log_refresh(app);
 }
 static void quick_log_exit(void* ctx) {

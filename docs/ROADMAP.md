@@ -92,14 +92,8 @@ Le submenu affiche les 23 presets en une seule liste plate. Les regrouper par ca
 
 ## 📝 Éditeur de note
 
-### Note persistante entre sessions
-Actuellement la note se reset au redémarrage de l'app. Sauvegarder `quick_note` dans un fichier + recharger à l'init.
-
-### Note par preset
-Mémoriser la dernière note utilisée **par preset** (ex. "wooden" reste attaché au preset Bench, "out of order" au preset Toilets).
-
-### Photo link field
-Nouvel onglet de note : photo ID. L'utilisateur tape le nom de sa photo (ex. `IMG_4521`) sur le Flipper, la note devient `photo:IMG_4521`. Au post-processing, on retrouve la photo par son nom.
+### Prefixe ou annotation automatique (dépassé par auto_photo_id)
+`auto_photo_id` couvre déjà le cas "je veux lier mes saves à mes photos téléphone". Autres automatisations possibles : auto-prefix d'un identifiant de session, tag de source (`source=survey`), etc.
 
 ---
 

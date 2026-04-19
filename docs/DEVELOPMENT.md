@@ -14,6 +14,7 @@ src/
   settings.h / .c    # Settings persistés sur SD + écran dédié (VariableItemList)
   last_points.h / .c # browser des N derniers points + actions Delete last / Clear all
   point_detail.h / .c# écran de détail d'un point (cliqué depuis Last points)
+  notes_cache.h / .c # cache persistant des notes par preset (notes_cache.txt sur SD)
   presets.h / .c     # loader de presets (fichier SD + fallback defaults + variantes)
   storage_helpers.h  # API publique du module storage
   storage.c          # écriture + lecture + suppression des fichiers de sortie

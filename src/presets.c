@@ -212,3 +212,10 @@ size_t preset_build_tag(const Preset* p, uint8_t variant_idx, char* out, size_t 
     int n = snprintf(out, out_size, "%s=%s", p->key, v);
     return n > 0 ? (size_t)n : 0;
 }
+
+size_t preset_build_primary_tag(const Preset* p, char* out, size_t out_size) {
+    if(!p || !out || out_size == 0) return 0;
+    const char* primary = p->variants[0] ? p->variants[0] : "";
+    int n = snprintf(out, out_size, "%s=%s", p->key, primary);
+    return n > 0 ? (size_t)n : 0;
+}

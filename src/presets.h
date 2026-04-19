@@ -33,3 +33,7 @@ const char* preset_value(const Preset* p, uint8_t variant_idx);
 //   - sinon : valeur alternative, résultat = "key=variant" (ex. "amenity=bench")
 // Écrit dans `out`, retourne le nombre d'octets écrits (hors null), ou 0 si erreur.
 size_t preset_build_tag(const Preset* p, uint8_t variant_idx, char* out, size_t out_size);
+
+// Construit le "primary tag" (key=primary_value) — sert de clé stable pour le
+// cache de notes. Ignore toujours la variante active. Ex. "amenity=bench".
+size_t preset_build_primary_tag(const Preset* p, char* out, size_t out_size);

@@ -31,6 +31,7 @@ void settings_defaults(Settings* s) {
     s->track_min_dist_m = 0;
     s->track_hdop_strict = false;
     s->preview_before_save = false;
+    s->auto_photo_id = false;
 }
 
 uint8_t baud_rate_to_idx(uint32_t baud) {
@@ -125,6 +126,8 @@ static void parse_settings_buffer(char* buf, size_t size, Settings* s) {
             s->track_hdop_strict = parse_uint(&buf[val_start], val_len) != 0;
         } else if(key_len == 19 && !strncmp(&buf[key_start], "preview_before_save", 19)) {
             s->preview_before_save = parse_uint(&buf[val_start], val_len) != 0;
+        } else if(key_len == 13 && !strncmp(&buf[key_start], "auto_photo_id", 13)) {
+            s->auto_photo_id = parse_uint(&buf[val_start], val_len) != 0;
         }
     }
 }
@@ -165,7 +168,7 @@ void settings_save(const Settings* s) {
 
     File* f = storage_file_alloc(st);
     if(f && storage_file_open(f, SETTINGS_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
-        char buf[384];
+        char buf[448];
         int n = snprintf(
             buf,
             sizeof(buf),
@@ -174,12 +177,14 @@ void settings_save(const Settings* s) {
             "track_interval_s=%u\n"
             "track_min_dist_m=%u\n"
             "track_hdop_strict=%u\n"
-            "preview_before_save=%u\n",
+            "preview_before_save=%u\n"
+            "auto_photo_id=%u\n",
             (unsigned long)s->baud_rate,
             (unsigned)s->track_interval_s,
             (unsigned)s->track_min_dist_m,
             s->track_hdop_strict ? 1u : 0u,
-            s->preview_before_save ? 1u : 0u);
+            s->preview_before_save ? 1u : 0u,
+            s->auto_photo_id ? 1u : 0u);
         if(n > 0) storage_file_write(f, buf, (size_t)n);
         storage_file_close(f);
     }
@@ -254,6 +259,18 @@ static void settings_preview_changed(VariableItem* item) {
     }
 }
 
+static void settings_auto_photo_changed(VariableItem* item) {
+    App* app = variable_item_get_context(item);
+    uint8_t idx = variable_item_get_current_value_index(item);
+    bool new_val = (idx != 0);
+    variable_item_set_current_value_text(item, ON_OFF[new_val ? 1 : 0]);
+
+    if(new_val != app->settings.auto_photo_id) {
+        app->settings.auto_photo_id = new_val;
+        settings_save(&app->settings);
+    }
+}
+
 static uint32_t settings_previous_callback(void* ctx) {
     (void)ctx;
     return AppViewMenu;
@@ -310,6 +327,16 @@ void app_start_settings(App* app) {
         variable_item_set_current_value_index(item, app->settings.preview_before_save ? 1 : 0);
         variable_item_set_current_value_text(
             item, ON_OFF[app->settings.preview_before_save ? 1 : 0]);
+
+        item = variable_item_list_add(
+            app->settings_list,
+            "Auto photo ID",
+            2,
+            settings_auto_photo_changed,
+            app);
+        variable_item_set_current_value_index(item, app->settings.auto_photo_id ? 1 : 0);
+        variable_item_set_current_value_text(
+            item, ON_OFF[app->settings.auto_photo_id ? 1 : 0]);
 
         app->settings_view = variable_item_list_get_view(app->settings_list);
         view_set_previous_callback(app->settings_view, settings_previous_callback);

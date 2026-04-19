@@ -20,6 +20,7 @@ typedef struct {
     uint8_t track_min_dist_m;  // 0 = désactivé
     bool track_hdop_strict;    // true : rejet des trkpts si HDOP > 2.5
     bool preview_before_save;  // true : Quick Log demande confirmation avant save
+    bool auto_photo_id;        // true : append "photo:<total_count+1>" à la note au save
 } Settings;
 
 void settings_defaults(Settings* s);

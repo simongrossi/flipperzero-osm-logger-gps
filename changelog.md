@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4 — 2026-04-19
+
+### Added
+- **Notes persistantes par preset** : la note saisie pour un preset (ex. "wooden bench") est sauvegardée dans `notes_cache.txt` sur la SD et rechargée automatiquement à la prochaine sélection du même preset.
+- **Auto photo ID** (toggle Settings) : append automatique de `photo:N` dans la note au save (N = total cumulatif + 1). Pratique pour aligner les saves Flipper avec des photos téléphone prises en parallèle.
+- **Tutoriel OSM pour débutants** : `docs/GETTING_STARTED_OSM.md` — guide complet de A à Z pour un premier contributeur OSM (câblage, app, premier fix, logger un POI, récupérer les fichiers, importer dans JOSM / iD, bonnes pratiques).
+
+### Changed
+- `settings.txt` ajoute la clé `auto_photo_id`.
+- Nouveau fichier `/ext/apps_data/osm_logger/notes_cache.txt` (format TAB-séparé `primary_tag<TAB>note`).
+
 ## 0.3 — 2026-04-19
 
 ### Added
