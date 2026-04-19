@@ -341,9 +341,15 @@ static bool quick_log_write_point(
     // Si OsmAnd n'a pas l'icône, il utilise une icône générique.
     const char* icon_hint = (p->variants[0] && p->variants[0][0]) ? p->variants[0] : "special_marker";
 
+    // ID OSM séquentiel : total_count est le nb de points existants,
+    // le nouveau sera donc le (total_count + 1)-ième. Utilisé comme ID négatif
+    // dans le .osm (convention OSM API pour nouveaux nodes non-uploadés).
+    uint32_t node_seq = app->total_count + 1;
+
     storage_write_all_formats(
         lat, lon, altitude, hdop, sats, tag, note,
-        p->label, cat_label, icon_hint, cat_color);
+        p->label, cat_label, icon_hint, cat_color,
+        node_seq);
     FURI_LOG_D("OSM", "write_point: formats written, saving note cache");
 
     // Cache de note (on persiste juste la note utilisateur, pas photo/avg)

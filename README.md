@@ -2,7 +2,7 @@
 
 > Log **OSM POIs** in the field with a **Flipper Zero** + **NEO-6M GPS** :
 > pick a POI type (bench, bin, drinking water, defibrillator…), save lat/lon/alt/timestamp/OSM tag
-> to microSD in **5 native formats** (JSONL, CSV, GPX, GeoJSON, GPX track).
+> to microSD in **6 native formats** (JSONL, CSV, GPX with OsmAnd extensions, GeoJSON, OSM XML, GPX track).
 
 ![osm_logger icon](osm_logger.png)
 
@@ -36,11 +36,12 @@
   - Each session starts a new `<trkseg>` (no bogus line between separate sessions)
   - Ideal for mapping a street or path on foot or bike
 - **Last points browser** (main menu entry): scrollable list of the 10 most recent saves. Tap any point to see full details (time, coords, altitude, HDOP, sats, tag, note). Actions: **Delete last** (undo across all 4 output files), **Archive session** (moves the 5 output files to a dated subfolder, ready to transfer as a unit via qFlipper) and **Clear all**.
-- Saves to `/ext/apps_data/osm_logger/` in **5 native formats** (all valid at all times):
+- Saves to `/ext/apps_data/osm_logger/` in **6 native formats** (all valid at all times):
   - `points.jsonl` — one JSON line per point
   - `notes.csv` — spreadsheet-friendly
-  - `points.gpx` — GPX 1.1 waypoints, direct import into JOSM / iD
+  - `points.gpx` — GPX 1.1 enriched with **OsmAnd Favorites** extensions (icons + colors + category), direct import into JOSM / iD / QGIS / OsmAnd
   - `points.geojson` — FeatureCollection, direct import into QGIS / geojson.io
+  - `points.osm` — **native OSM XML API 0.6**, editable data layer in JOSM (pro workflow: edit + direct OSM upload)
   - `track.gpx` — GPX `<trkseg>` track, import into any GPX viewer
 - Works on **stock and Momentum firmware** (the app auto-disables the Expansion service to free the UART)
 

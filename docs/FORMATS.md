@@ -74,6 +74,46 @@ Fichier XML valide à tout moment (après chaque OK). Enrichi avec le namespace 
 
 L'app utilise un *write-append-framed* : à chaque save elle ouvre le fichier en R/W, seek juste avant `</gpx>`, truncate, écrit le nouveau `<wpt>` et réécrit le footer. Le fichier reste donc valide XML même après une coupure de courant **entre deux saves**.
 
+## `points.osm` — OSM XML natif (API 0.6)
+
+Fichier au format **OSM API 0.6** chargeable directement dans **JOSM** comme **data layer** (pas juste un layer de waypoints). Chaque point devient un `<node>` avec ses tags OSM réels, prêt à être édité et uploadé sur openstreetmap.org en quelques clics.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="Flipper Zero OSM Logger" upload="false">
+  <node id="-1" lat="48.431234" lon="-0.093210" visible="true">
+    <tag k="amenity" v="bench"/>
+    <tag k="material" v="wood"/>
+    <tag k="ele" v="45.2"/>
+    <tag k="note" v="wooden slats, needs repair"/>
+    <tag k="flipper:hdop" v="1.3"/>
+    <tag k="flipper:sats" v="9"/>
+    <tag k="flipper:time" v="2026-04-19T08:45:12Z"/>
+  </node>
+</osm>
+```
+
+### Convention des IDs
+
+Les IDs sont négatifs incrémentaux (`-1`, `-2`, `-3`…) — c'est la **convention OSM API** pour les nodes "nouveaux" pas encore uploadés. JOSM les reconnaît automatiquement et t'invite à les créer réellement sur le serveur au moment de l'upload.
+
+### Tags générés
+
+- **Tags primaires OSM** : le contenu de `tag` (ex. `amenity=bench`) est éclaté en plusieurs `<tag>` si multi-valué (`amenity=bench;material=wood` → 2 balises `<tag>`)
+- **`ele=`** : altitude (mètres) si disponible
+- **`note=`** : contenu de la note utilisateur (y compris `photo:N`, `avg` si activés)
+- **`flipper:hdop`, `flipper:sats`, `flipper:time`** : métadonnées Flipper, préfixées par `flipper:` pour qu'elles soient **supprimables en un clic** dans JOSM avant l'upload final (convention OSM : les tags avec préfixe custom sont non-standard)
+
+### Workflow recommandé
+
+1. Transférer `points.osm` vers ton ordi via qFlipper
+2. Ouvrir JOSM → **Fichier → Ouvrir** → choisir le `.osm` → accepter "Ouvrir comme fichier OSM (data layer)"
+3. Chaque point apparaît comme un vrai node OSM éditable. Modifier les tags si besoin.
+4. Avant upload : **Édition → Rechercher** → `type:node flipper:*` pour sélectionner tes tags Flipper, puis **Supprimer** pour les retirer (uniquement si tu le souhaites).
+5. **Fichier → Uploader** → les nodes sont créés sur OSM avec leurs bons IDs.
+
+C'est **LE format pro** pour un workflow OSM complet. `points.gpx` reste utile pour la visualisation rapide dans OsmAnd/QGIS, `points.osm` est pour l'édition et l'upload.
+
 ## `points.geojson` — GeoJSON FeatureCollection
 
 Également valide à tout moment, prêt pour import direct dans **QGIS**, **geojson.io**, **iD**, etc.

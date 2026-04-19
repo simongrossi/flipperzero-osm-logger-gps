@@ -3,9 +3,54 @@
 Ce fichier liste tout ce qui reste à faire dans l'app, groupé par thème et priorité.
 
 **Pour un état "v1.0 catalogue-ready polished"**, la suite recommandée est :
-1. Tests unitaires parser NMEA (invoqué dans la CI)
-2. Détection de doublons plus fine (seuil dynamique selon HDOP ?)
-3. OSM Notes API via WiFi dev board (le gros morceau ambitieux, v1.0+)
+1. Survey mode (auto `source=survey` + `check_date`) — win facile pour la crédibilité OSM
+2. Preset search par lettres (scale à 100+ presets)
+3. POI confidence rating (étoiles 1-5 → `flipper:confidence=N`)
+4. Tests unitaires parser NMEA (invoqué dans la CI)
+5. OSM Notes API via WiFi dev board (le gros morceau ambitieux, v1.0+)
+
+---
+
+## 🗺️ Features OSM-spécifiques
+
+### Survey mode
+Toggle dans Settings qui ajoute automatiquement `source=survey` et `survey:date=YYYY-MM-DD` au tag de chaque save. Ces deux tags sont la norme OSM pour signaler "vérifié sur place". Très apprécié par la community au moment du review des contributions.
+
+### POI confidence rating
+Avant chaque save, permettre à l'utilisateur de noter la qualité de son observation (1-5 étoiles) via ←/→ sur un petit écran dédié. Sauvegardé dans `flipper:confidence=N` (tag custom, removable avant upload). Permet de filtrer les points douteux au post-traitement.
+
+### Preset search par lettres
+Dans le sous-menu des presets, permettre à l'utilisateur de taper 2-3 lettres (via le text-input Flipper) pour filtrer la liste. Essentiel si on scale à 100+ presets (via `presets.txt` custom ou schema iD import).
+
+### Overpass pré-check (WiFi dev board)
+Avant save, query l'API Overpass pour la zone courante. Récupère les POIs existants avec le même tag. Warn si un POI existe déjà à < X mètres en OSM réel (pas juste dans nos saves locaux). Nécessite WiFi.
+
+### OSM Notes API direct (WiFi dev board)
+Poster un OSM Note directement depuis le Flipper via HTTP. Ferme la boucle A→Z en terrain. Nécessite WiFi + auth OSM (ou Note anonyme).
+
+### OSM changeset upload direct (WiFi dev board)
+Upload direct des points via l'OSM API (OAuth). Le saint graal — plus besoin de PC. XXL.
+
+### Autofill addr:street
+Récupérer le nom de rue depuis Overpass au moment du save d'une adresse, pré-remplir `addr:street=...`. Requires WiFi.
+
+### Ways / lignes
+Série de points consécutifs formant un chemin (sentier, clôture, ligne électrique). Nouveau format de sortie avec `<way>` OSM + série de node refs.
+
+### Building outlines
+Enregistrer les 4 (ou N) coins d'un bâtiment → polygone OSM `<way>` avec `building=yes`. Mode dédié "cliquer aux 4 coins".
+
+### Import schema iD (id-tagging-schema)
+Parser le JSON officiel iD (100+ presets avec noms multi-lingues, icônes, suggestions de tags). Énorme gain de richesse.
+
+### MapComplete quick-link
+À chaque save, ajouter dans le JSONL une URL MapComplete qui ouvre la vue sur ce point. Permet vérification visuelle rapide au post-traitement.
+
+### StreetComplete quest export
+Format compatible StreetComplete pour dispatcher tes points à d'autres mappeurs. Le format n'est pas documenté officiellement mais existant.
+
+### OpenStreetMap username dans Settings
+Pré-crediter dans les métadonnées de tous les fichiers. Setting texte dans Settings.
 
 ---
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.13 — 2026-04-19
+
+### Added
+- **Export OSM XML natif** (`points.osm`) — 6e format de sortie, au format OSM API 0.6. Chaque point devient un `<node>` avec ses tags OSM éclatés (multi-tag `amenity=bench;material=wood` → 2 balises `<tag>`) + altitude en `ele=` + note user + méta `flipper:hdop/sats/time`. IDs négatifs incrémentaux (convention OSM pour nouveaux nodes pas encore uploadés). Directement chargeable dans JOSM comme **data layer** éditable (pas juste des waypoints) → workflow pro : édition + upload OSM en quelques clics.
+- **Support complet du nouveau fichier** dans :
+  - `delete_last` : supprime le dernier `<node>` et réécrit le footer `</osm>`
+  - `clear_all` : `storage_common_remove` du `points.osm`
+  - `archive_session` : inclut `points.osm` dans l'archive datée
+- Helper `xml_escape` : échappe les 5 caractères XML critiques (`& < > " '`) pour éviter les XML mal formés en cas de caractères spéciaux dans les notes.
+
+### Changed
+- `storage_write_all_formats` accepte désormais un 12e paramètre `node_seq` (compteur séquentiel pour l'ID OSM négatif).
+- README et docs FORMATS mentionnent le nouveau format + workflow JOSM recommandé.
+
+### Roadmap OSM étoffée
+Nouvelle section **OSM-spécifiques** dans `docs/ROADMAP.md` listant : Survey mode, POI confidence rating, Preset search par lettres, Overpass pré-check (WiFi), OSM Notes API direct (WiFi), changeset upload direct (WiFi), autofill `addr:street`, ways/lignes, building outlines, import schema iD, MapComplete link, StreetComplete export, username setting.
+
 ## 0.12 — 2026-04-19
 
 ### Added

@@ -93,6 +93,31 @@ static const char GPX_HEADER[] =
     "xmlns:osmand=\"https://osmand.net\">\n";
 static const char GPX_FOOTER[] = "</gpx>\n";
 
+// Format OSM XML API 0.6 — chargeable comme data layer dans JOSM.
+// `upload="false"` : JOSM considère le layer comme une review avant upload,
+// les IDs négatifs sont le protocole standard pour les nouveaux nodes.
+static const char OSM_XML_HEADER[] =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "<osm version=\"0.6\" generator=\"Flipper Zero OSM Logger\" upload=\"false\">\n";
+static const char OSM_XML_FOOTER[] = "</osm>\n";
+
+// Échappement XML minimal (& < > " ') sur out_size octets max.
+static size_t xml_escape(char* dst, size_t dst_size, const char* src) {
+    if(!dst || dst_size == 0) return 0;
+    size_t o = 0;
+    while(src && *src && o + 6 < dst_size) {
+        if(*src == '&') { memcpy(&dst[o], "&amp;", 5); o += 5; }
+        else if(*src == '<') { memcpy(&dst[o], "&lt;", 4); o += 4; }
+        else if(*src == '>') { memcpy(&dst[o], "&gt;", 4); o += 4; }
+        else if(*src == '"') { memcpy(&dst[o], "&quot;", 6); o += 6; }
+        else if(*src == '\'') { memcpy(&dst[o], "&apos;", 6); o += 6; }
+        else dst[o++] = *src;
+        src++;
+    }
+    dst[o] = '\0';
+    return o;
+}
+
 static const char GEOJSON_HEADER[] = "{\"type\":\"FeatureCollection\",\"features\":[\n";
 static const char GEOJSON_FOOTER[] = "\n]}\n";
 
@@ -107,7 +132,8 @@ void storage_write_all_formats(
     const char* display_name,
     const char* category_label,
     const char* osmand_icon,
-    const char* osmand_color) {
+    const char* osmand_color,
+    uint32_t node_seq) {
     Storage* s = furi_record_open(RECORD_STORAGE);
     if(!ensure_dir(s)) {
         furi_record_close(RECORD_STORAGE);
@@ -252,6 +278,86 @@ void storage_write_all_formats(
         FURI_LOG_D("OSM", "write: geojson done");
     }
 
+    // OSM XML (API 0.6) — data layer chargeable directement dans JOSM.
+    // Chaque point devient un <node> avec ID négatif (convention OSM pour
+    // nouveaux nodes pas encore uploadés). Les tags multi-clés (séparés par
+    // ';' dans `tag_s`) sont éclatés en plusieurs <tag k="..." v="..."/>.
+    {
+        char node[640];
+        int w = 0;
+        w += snprintf(
+            node + w,
+            sizeof(node) - w,
+            "  <node id=\"-%lu\" lat=\"%.6f\" lon=\"%.6f\" visible=\"true\">\n",
+            (unsigned long)node_seq,
+            (double)lat,
+            (double)lon);
+
+        // Parse tag_s "k1=v1;k2=v2;..." et émet un <tag k v/> par paire
+        if(tag_s && tag_s[0]) {
+            char tag_copy[96];
+            strncpy(tag_copy, tag_s, sizeof(tag_copy) - 1);
+            tag_copy[sizeof(tag_copy) - 1] = '\0';
+            char* token = tag_copy;
+            while(token && *token && w < (int)sizeof(node) - 80) {
+                char* semi = strchr(token, ';');
+                if(semi) *semi = '\0';
+                char* eq = strchr(token, '=');
+                if(eq) {
+                    *eq = '\0';
+                    const char* k = token;
+                    const char* v = eq + 1;
+                    char v_esc[64];
+                    xml_escape(v_esc, sizeof(v_esc), v);
+                    w += snprintf(
+                        node + w, sizeof(node) - w,
+                        "    <tag k=\"%s\" v=\"%s\"/>\n", k, v_esc);
+                }
+                if(!semi) break;
+                token = semi + 1;
+            }
+        }
+
+        // Altitude en tag ele= (convention OSM)
+        if(altitude != 0.0f && w < (int)sizeof(node) - 60) {
+            w += snprintf(
+                node + w, sizeof(node) - w,
+                "    <tag k=\"ele\" v=\"%.1f\"/>\n", (double)altitude);
+        }
+
+        // Note utilisateur en tag note= (convention OSM)
+        if(note && note[0] && w < (int)sizeof(node) - 80) {
+            char note_esc[128];
+            xml_escape(note_esc, sizeof(note_esc), note);
+            w += snprintf(
+                node + w, sizeof(node) - w,
+                "    <tag k=\"note\" v=\"%s\"/>\n", note_esc);
+        }
+
+        // Métadonnées FlipperOSM (pour retrouver nos points dans JOSM)
+        if(w < (int)sizeof(node) - 80) {
+            w += snprintf(
+                node + w, sizeof(node) - w,
+                "    <tag k=\"flipper:hdop\" v=\"%.1f\"/>\n"
+                "    <tag k=\"flipper:sats\" v=\"%u\"/>\n"
+                "    <tag k=\"flipper:time\" v=\"%s\"/>\n",
+                (double)hdop, (unsigned)sats, iso);
+        }
+
+        w += snprintf(node + w, sizeof(node) - w, "  </node>\n");
+
+        FURI_LOG_D("OSM", "write: osm start");
+        write_append_framed(
+            s,
+            "/ext/apps_data/osm_logger/points.osm",
+            OSM_XML_HEADER,
+            node,
+            NULL,
+            OSM_XML_FOOTER,
+            sizeof(OSM_XML_FOOTER) - 1);
+        FURI_LOG_D("OSM", "write: osm done");
+    }
+
     furi_record_close(RECORD_STORAGE);
 }
 
@@ -370,6 +476,35 @@ static bool trim_last_gpx_wpt(Storage* s) {
     return true;
 }
 
+// OSM XML : supprime le dernier <node>...</node> et réécrit le footer.
+static bool trim_last_osm_node(Storage* s) {
+    const char* path = "/ext/apps_data/osm_logger/points.osm";
+    uint32_t size = 0;
+    char* buf = read_whole_file(s, path, &size, 131072); // 128K pour .osm (gros fichier)
+    if(!buf) return false;
+
+    // Trouve la dernière occurrence de "  <node "
+    char* last = NULL;
+    for(char* p = buf; p + 8 < buf + size; p++) {
+        if(!memcmp(p, "  <node ", 8)) last = p;
+    }
+    if(!last) {
+        free(buf);
+        return false;
+    }
+
+    size_t new_size = (size_t)(last - buf);
+    File* f = storage_file_alloc(s);
+    if(f && storage_file_open(f, path, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        storage_file_write(f, buf, new_size);
+        storage_file_write(f, OSM_XML_FOOTER, sizeof(OSM_XML_FOOTER) - 1);
+        storage_file_close(f);
+    }
+    if(f) storage_file_free(f);
+    free(buf);
+    return true;
+}
+
 // GeoJSON : supprime la dernière Feature et réécrit le footer.
 static bool trim_last_geojson_feature(Storage* s) {
     const char* path = "/ext/apps_data/osm_logger/points.geojson";
@@ -411,8 +546,9 @@ bool storage_delete_last_point(void) {
     bool any = false;
     if(trim_last_line(s, "/ext/apps_data/osm_logger/points.jsonl")) any = true;
     if(trim_last_line(s, "/ext/apps_data/osm_logger/notes.csv")) any = true;
-    trim_last_gpx_wpt(s);       // best-effort
+    trim_last_gpx_wpt(s);         // best-effort
     trim_last_geojson_feature(s); // best-effort
+    trim_last_osm_node(s);        // best-effort
     furi_record_close(RECORD_STORAGE);
     return any;
 }
@@ -423,6 +559,7 @@ void storage_clear_all_points(void) {
     storage_common_remove(s, "/ext/apps_data/osm_logger/notes.csv");
     storage_common_remove(s, "/ext/apps_data/osm_logger/points.gpx");
     storage_common_remove(s, "/ext/apps_data/osm_logger/points.geojson");
+    storage_common_remove(s, "/ext/apps_data/osm_logger/points.osm");
     furi_record_close(RECORD_STORAGE);
 }
 
@@ -576,7 +713,8 @@ bool storage_archive_session(char* err, size_t err_size) {
 
     // Renomme les fichiers (silencieux si absent)
     static const char* const files[] = {
-        "points.jsonl", "notes.csv", "points.gpx", "points.geojson", "track.gpx",
+        "points.jsonl", "notes.csv", "points.gpx", "points.geojson",
+        "points.osm", "track.gpx",
     };
     bool any = false;
     for(size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++) {
