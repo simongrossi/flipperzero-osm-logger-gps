@@ -5,22 +5,29 @@
 ```
 src/
   osm_logger.c       # entry point (redirige vers app)
-  app.h / app.c      # struct App, init/teardown, view dispatcher, ISR UART
+  app.h / app.c      # struct App, init/teardown, ViewDispatcher, ISR UART, tick
   nmea.h / nmea.c    # parser NMEA (RMC, GGA) sans atof/strtok
-  quick_log.h / .c   # écran Quick Log + view model + refresh
-  presets.h / .c     # table des presets OSM (modifiable ici)
+  quick_log.h / .c   # écran Quick Log (waypoint) + variantes + note
+  track.h / .c       # écran Mode trace (auto-log GPX) + FuriTimer
+  status.h / .c      # écran Statut GPS diagnostic
+  about.h / .c       # écran About (auteur, lien GitHub, licence)
+  presets.h / .c     # loader de presets (fichier SD + fallback defaults + variantes)
   storage_helpers.h  # API publique du module storage
-  storage.c          # écriture JSONL + CSV
-application.fam     # manifest ufbt
+  storage.c          # écriture JSONL + CSV + GPX + GeoJSON + track.gpx
+application.fam      # manifest ufbt
 ```
 
 ### Vues (`AppView` enum dans app.h)
 
-| ID | Vue           | Type             | Back → |
-|----|---------------|------------------|--------|
-| 0  | `AppViewMenu`     | Submenu    | exit app |
-| 1  | `AppViewPresets`  | Submenu    | `AppViewMenu` (via previous_callback) |
-| 2  | `AppViewQuickLog` | View+model | `AppViewPresets` (via previous_callback) |
+| ID | Vue               | Type         | Back → |
+|----|-------------------|--------------|--------|
+| 0  | `AppViewMenu`     | Submenu      | exit app (nav callback retourne false) |
+| 1  | `AppViewPresets`  | Submenu      | `AppViewMenu` (previous_callback) |
+| 2  | `AppViewQuickLog` | View+model   | `AppViewPresets` (previous_callback) |
+| 3  | `AppViewTrack`    | View+model   | `AppViewMenu` (previous_callback) |
+| 4  | `AppViewStatus`   | View+model   | `AppViewMenu` (previous_callback) |
+| 5  | `AppViewNote`     | TextInput    | retour Quick Log via result callback |
+| 6  | `AppViewAbout`    | View (static)| `AppViewMenu` (previous_callback) |
 
 ### Vue Quick Log : view model + tick refresh
 
@@ -39,18 +46,36 @@ C'est la seule façon propre de rafraîchir une vue depuis "l'extérieur" sur Fl
 
 ## Ajouter des presets
 
-Éditer [src/presets.c](../src/presets.c), ajouter une ligne dans le tableau :
+### Option A — Sans recompiler (via microSD)
+
+Copier [presets.txt.sample](../presets.txt.sample) sur la SD sous `/ext/apps_data/osm_logger/presets.txt`. Format :
+
+```
+# Commentaire
+Banc;amenity;bench
+Poubelle;amenity;waste_basket
+Mon POI;shop;florist
+```
+
+Séparateur strict `;`, une entrée par ligne, lignes vides ignorées, `#` en début = commentaire. Au démarrage, l'app cherche ce fichier — s'il est présent et parsable, il remplace la liste compilée.
+
+Limite : 64 entrées max, fichier ≤ 4 Ko (`PRESETS_MAX_ENTRIES` et `PRESETS_MAX_FILE_SIZE` dans `presets.c`).
+
+### Option B — Compilé en dur (par défaut)
+
+Éditer le tableau `DEFAULT_PRESETS[]` dans [src/presets.c](../src/presets.c), ajouter une ligne :
 
 ```c
 {"Mon label", "amenity", "ma_valeur"},
 ```
 
-Contraintes :
+### Contraintes (valables pour les deux méthodes)
+
 - Label ≤ 18 caractères (sinon tronqué à l'écran Quick Log en FontPrimary)
 - Pas d'accents (la font par défaut ne les rend pas)
 - `key` et `value` suivent la nomenclature OSM — chercher sur https://taginfo.openstreetmap.org/
 
-Pas besoin de changer autre chose : `PRESETS_COUNT` est calculé par `sizeof()`, et le submenu des presets est généré automatiquement à partir du tableau au démarrage de l'app.
+Le submenu des presets est généré automatiquement à partir de `presets_get(i)` au démarrage de l'app, donc rien d'autre à modifier.
 
 ## Build & flash
 

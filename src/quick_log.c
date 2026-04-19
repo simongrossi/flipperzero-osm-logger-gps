@@ -25,25 +25,44 @@ typedef struct {
     float altitude;
     uint8_t sats;
     uint8_t preset_idx;
+    uint8_t variant_idx;
+    uint8_t variant_count;
     uint16_t session_count;
-    uint32_t fix_age_s; // secondes écoulées depuis le dernier fix (0 si jamais eu)
-    bool fix_ever;      // true si on a déjà eu un fix au moins une fois
+    uint32_t total_count;
+    uint32_t fix_age_s;
+    bool fix_ever;
+    char note[64];
 } QuickLogModel;
 
 static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     QuickLogModel* m = (QuickLogModel*)ctx;
-    uint8_t idx = m->preset_idx < PRESETS_COUNT ? m->preset_idx : 0;
-    const Preset* p = &PRESETS[idx];
+    const Preset* p = presets_get(m->preset_idx);
+    if(!p) p = presets_get(0);
+    if(!p) return;
 
     canvas_clear(canvas);
 
-    // Header : label du preset
+    // Header : label du preset (avec marqueur de variante si plusieurs)
     canvas_set_font(canvas, FontPrimary);
-    elements_multiline_text_aligned(canvas, 64, 2, AlignCenter, AlignTop, p->label);
+    if(m->variant_count > 1) {
+        char header[48];
+        snprintf(
+            header,
+            sizeof(header),
+            "< %s %u/%u >",
+            p->label,
+            (unsigned)(m->variant_idx + 1),
+            (unsigned)m->variant_count);
+        elements_multiline_text_aligned(canvas, 64, 2, AlignCenter, AlignTop, header);
+    } else {
+        elements_multiline_text_aligned(canvas, 64, 2, AlignCenter, AlignTop, p->label);
+    }
 
-    // Tag OSM
+    // Tag OSM : valeur dépend de la variante courante
+    const char* val = preset_value(p, m->variant_idx);
+    if(!val) val = "?";
     char tag[48];
-    snprintf(tag, sizeof(tag), "%s=%s", p->key, p->value);
+    snprintf(tag, sizeof(tag), "%s=%s", p->key, val);
     canvas_set_font(canvas, FontSecondary);
     elements_multiline_text_aligned(canvas, 64, 16, AlignCenter, AlignTop, tag);
 
@@ -66,23 +85,30 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     elements_multiline_text_aligned(canvas, 64, 28, AlignCenter, AlignTop, line1);
     elements_multiline_text_aligned(canvas, 64, 38, AlignCenter, AlignTop, line2);
 
-    // Ligne altitude + age du fix
-    char line3[48];
+    // Ligne altitude + age du fix + total
+    char line3[56];
     if(m->fix_ever) {
         snprintf(
             line3,
             sizeof(line3),
-            "alt=%.0fm  fix=%lus",
+            "alt=%.0fm fix=%lus  t=%lu",
             (double)m->altitude,
-            (unsigned long)m->fix_age_s);
+            (unsigned long)m->fix_age_s,
+            (unsigned long)m->total_count);
     } else {
-        snprintf(line3, sizeof(line3), "alt=--  fix=--");
+        snprintf(line3, sizeof(line3), "alt=-- fix=--  t=%lu", (unsigned long)m->total_count);
     }
     elements_multiline_text_aligned(canvas, 64, 48, AlignCenter, AlignTop, line3);
 
-    // Footer
-    elements_multiline_text_aligned(
-        canvas, 64, 62, AlignCenter, AlignBottom, "OK save  Hold=force  Back");
+    // Footer : si note non-vide l'afficher, sinon rappel touches
+    if(m->note[0]) {
+        char footer[80];
+        snprintf(footer, sizeof(footer), "note: %s", m->note);
+        elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, footer);
+    } else {
+        elements_multiline_text_aligned(
+            canvas, 64, 62, AlignCenter, AlignBottom, "OK save  Up:note  <>:variant");
+    }
 }
 
 static bool quick_log_input_callback(InputEvent* event, void* ctx) {
@@ -90,30 +116,64 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
 
     bool ok_short = (event->type == InputTypeShort && event->key == InputKeyOk);
     bool ok_long = (event->type == InputTypeLong && event->key == InputKeyOk);
+    bool is_press = (event->type == InputTypeShort || event->type == InputTypeRepeat);
+
+    // ←/→ : cycle sur les variantes du preset courant
+    if(is_press && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+        const Preset* p = presets_get(app->current_preset);
+        if(p && p->variant_count > 1) {
+            if(event->key == InputKeyRight) {
+                app->current_variant = (uint8_t)((app->current_variant + 1) % p->variant_count);
+            } else {
+                app->current_variant = app->current_variant == 0
+                                           ? (uint8_t)(p->variant_count - 1)
+                                           : (uint8_t)(app->current_variant - 1);
+            }
+            quick_log_refresh(app);
+        }
+        return true;
+    }
+
+    // UP : ouvre l'éditeur de note
+    if(event->type == InputTypeShort && event->key == InputKeyUp) {
+        view_dispatcher_switch_to_view(app->dispatcher, AppViewNote);
+        return true;
+    }
+
+    // DOWN : efface la note courante
+    if(event->type == InputTypeShort && event->key == InputKeyDown) {
+        app->quick_note[0] = '\0';
+        quick_log_refresh(app);
+        return true;
+    }
 
     if(ok_short || ok_long) {
         bool force = ok_long;
         bool quality_ok = app->has_fix && (app->hdop <= HDOP_MAX);
 
         if(!quality_ok && !force) {
-            // Qualité insuffisante -> refus (seul OK long force la sauvegarde)
             notification_message(app->notification, &sequence_error);
             return true;
         }
 
-        uint8_t idx = app->current_preset < PRESETS_COUNT ? app->current_preset : 0;
-        const Preset* p = &PRESETS[idx];
+        const Preset* p = presets_get(app->current_preset);
+        if(!p) p = presets_get(0);
+        if(!p) return true;
+        const char* val = preset_value(p, app->current_variant);
+        if(!val) val = "";
         char tag[48];
-        snprintf(tag, sizeof(tag), "%s=%s", p->key, p->value);
+        snprintf(tag, sizeof(tag), "%s=%s", p->key, val);
+        const char* note = app->quick_note[0] ? app->quick_note : NULL;
         storage_write_all_formats(
-            app->lat, app->lon, app->altitude, app->hdop, app->sats, tag, NULL);
+            app->lat, app->lon, app->altitude, app->hdop, app->sats, tag, note);
         app->session_count++;
+        app->total_count++;
         quick_log_refresh(app);
         notification_message(app->notification, &sequence_success);
         return true;
     }
 
-    return false; // Back tombe sur previous_callback -> retour submenu presets
+    return false;
 }
 
 static uint32_t quick_log_previous_callback(void* ctx) {
@@ -151,9 +211,15 @@ void quick_log_refresh(App* app) {
             m->altitude = app->altitude;
             m->sats = app->sats;
             m->preset_idx = app->current_preset;
+            m->variant_idx = app->current_variant;
+            const Preset* p = presets_get(app->current_preset);
+            m->variant_count = p ? p->variant_count : 1;
             m->session_count = app->session_count;
+            m->total_count = app->total_count;
             m->fix_age_s = age_s;
             m->fix_ever = fix_ever;
+            strncpy(m->note, app->quick_note, sizeof(m->note) - 1);
+            m->note[sizeof(m->note) - 1] = '\0';
         },
         true);
 }

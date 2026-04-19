@@ -12,6 +12,9 @@
 
 #include "nmea.h"
 #include "quick_log.h"
+#include "track.h"
+#include "status.h"
+#include "about.h"
 #include "presets.h"
 #include "storage_helpers.h"
 
@@ -21,7 +24,9 @@ static void preset_menu_callback(void* ctx, uint32_t index);
 
 typedef enum {
     MenuItemQuickLog = 0,
-    MenuItemStatus = 1,
+    MenuItemTrack = 1,
+    MenuItemStatus = 2,
+    MenuItemAbout = 3,
 } MenuItem;
 
 // Back depuis le menu principal -> on sort de l'app
@@ -36,22 +41,18 @@ static uint32_t preset_menu_previous(void* ctx) {
     return AppViewMenu;
 }
 
-// Tick périodique -> met à jour le modèle de la vue Quick Log
+// Tick périodique (500 ms) -> rafraîchit les vues + consomme les notifications
+// posées par l'ISR (pas de call GUI depuis IRQ).
 static void app_tick_callback(void* ctx) {
     App* app = (App*)ctx;
-    quick_log_refresh(app);
-}
-
-// --- Helpers
-void app_show_status(App* app) {
-    if(app->has_fix) {
-        FURI_LOG_I("OSM", "Fix OK lat=%.6f lon=%.6f HDOP=%.1f sats=%u",
-                   (double)app->lat, (double)app->lon, (double)app->hdop, app->sats);
+    if(app->pending_fix_notify) {
+        app->pending_fix_notify = false;
         notification_message(app->notification, &sequence_success);
-    } else {
-        FURI_LOG_W("OSM", "No fix (sats=%u)", app->sats);
-        notification_message(app->notification, &sequence_error);
+        FURI_LOG_I("OSM", "GPS fix acquired");
     }
+    quick_log_refresh(app);
+    track_refresh(app);
+    status_refresh(app);
 }
 
 // --- RX async callback (IRQ): NE PAS toucher au GUI depuis une IRQ
@@ -74,13 +75,17 @@ static void serial_rx_callback(FuriHalSerialHandle* handle, FuriHalSerialRxEvent
                     nmea_parse_line(
                         app->nmea_line, &has_fix, &lat, &lon, &hdop, &sats, &altitude);
 
+                    bool was_fix = app->has_fix;
                     app->has_fix = has_fix;
                     app->lat = lat;
                     app->lon = lon;
                     app->hdop = hdop;
                     app->altitude = altitude;
                     app->sats = sats;
-                    if(has_fix) app->last_fix_tick = furi_get_tick();
+                    if(has_fix) {
+                        app->last_fix_tick = furi_get_tick();
+                        if(!was_fix) app->pending_fix_notify = true;
+                    }
 
                     app->nmea_pos = 0;
                 }
@@ -101,18 +106,35 @@ static void app_menu_callback(void* ctx, uint32_t index) {
     App* app = ctx;
     if(index == MenuItemQuickLog) {
         view_dispatcher_switch_to_view(app->dispatcher, AppViewPresets);
+    } else if(index == MenuItemTrack) {
+        app_start_track(app);
     } else if(index == MenuItemStatus) {
-        app_show_status(app);
+        app_start_status(app);
+    } else if(index == MenuItemAbout) {
+        app_start_about(app);
     }
 }
 
 // --- Sous-menu presets : choix -> ouvre Quick Log avec ce preset
 static void preset_menu_callback(void* ctx, uint32_t index) {
     App* app = ctx;
-    if(index < PRESETS_COUNT) {
+    if(index < presets_count()) {
         app->current_preset = (uint8_t)index;
+        app->current_variant = 0; // reset de la variante à chaque nouveau choix
     }
     app_start_quick_log(app);
+}
+
+// --- Note TextInput : validation -> retour Quick Log
+static void note_input_callback(void* ctx) {
+    App* app = (App*)ctx;
+    view_dispatcher_switch_to_view(app->dispatcher, AppViewQuickLog);
+}
+
+// Back depuis le TextInput -> retour Quick Log (et non exit app)
+static uint32_t note_input_previous(void* ctx) {
+    (void)ctx;
+    return AppViewQuickLog;
 }
 
 // --- Entry point
@@ -134,24 +156,49 @@ int32_t app(void* p) {
     view_dispatcher_set_tick_event_callback(app->dispatcher, app_tick_callback, 500);
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
 
+    // Init des presets (depuis SD si dispo, sinon defaults)
+    presets_init();
+
+    // Total cumulatif de points (compte les lignes de points.jsonl existant)
+    app->total_count = storage_count_saved_points();
+
     // Menu principal
     app->menu = submenu_alloc();
     submenu_add_item(
         app->menu, "Mode rapide (Quick Log)", MenuItemQuickLog, app_menu_callback, app);
     submenu_add_item(
-        app->menu, "Statut GPS (vibre/LED + log)", MenuItemStatus, app_menu_callback, app);
+        app->menu, "Mode trace (track GPX)", MenuItemTrack, app_menu_callback, app);
+    submenu_add_item(
+        app->menu, "Statut GPS", MenuItemStatus, app_menu_callback, app);
+    submenu_add_item(
+        app->menu, "About", MenuItemAbout, app_menu_callback, app);
     View* menu_view = submenu_get_view(app->menu);
     view_dispatcher_add_view(app->dispatcher, AppViewMenu, menu_view);
 
     // Sous-menu des presets OSM
     app->preset_menu = submenu_alloc();
     submenu_set_header(app->preset_menu, "Type de POI");
-    for(uint8_t i = 0; i < PRESETS_COUNT; i++) {
-        submenu_add_item(app->preset_menu, PRESETS[i].label, i, preset_menu_callback, app);
+    for(uint8_t i = 0; i < presets_count(); i++) {
+        submenu_add_item(
+            app->preset_menu, presets_get(i)->label, i, preset_menu_callback, app);
     }
     View* preset_view = submenu_get_view(app->preset_menu);
     view_set_previous_callback(preset_view, preset_menu_previous);
     view_dispatcher_add_view(app->dispatcher, AppViewPresets, preset_view);
+
+    // Éditeur de note (TextInput partagé, alloué une seule fois)
+    app->note_input = text_input_alloc();
+    text_input_set_header_text(app->note_input, "Note courte (OK=valider)");
+    text_input_set_result_callback(
+        app->note_input,
+        note_input_callback,
+        app,
+        app->quick_note,
+        sizeof(app->quick_note),
+        false /* on garde le texte précédent */);
+    View* note_view = text_input_get_view(app->note_input);
+    view_set_previous_callback(note_view, note_input_previous);
+    view_dispatcher_add_view(app->dispatcher, AppViewNote, note_view);
 
     view_dispatcher_switch_to_view(app->dispatcher, AppViewMenu);
 
@@ -181,6 +228,16 @@ int32_t app(void* p) {
         app->expansion = NULL;
     }
 
+    app_stop_track(app);
+    app_stop_status(app);
+    app_stop_about(app);
+
+    if(app->note_input) {
+        view_dispatcher_remove_view(app->dispatcher, AppViewNote);
+        text_input_free(app->note_input);
+        app->note_input = NULL;
+    }
+
     if(app->quick_view) {
         view_dispatcher_remove_view(app->dispatcher, AppViewQuickLog);
         view_free(app->quick_view);
@@ -193,6 +250,8 @@ int32_t app(void* p) {
     submenu_free(app->menu);
 
     view_dispatcher_free(app->dispatcher);
+
+    presets_deinit();
 
     furi_record_close(RECORD_NOTIFICATION);
     furi_record_close(RECORD_GUI);

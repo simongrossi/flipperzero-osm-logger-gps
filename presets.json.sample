@@ -1,7 +1,0 @@
-[
-  {"label":"Banc","tags":{"amenity":"bench"}},
-  {"label":"Poubelle","tags":{"amenity":"waste_basket"}},
-  {"label":"Fontaine","tags":{"amenity":"drinking_water"}},
-  {"label":"Panier de basket","tags":{"amenity":"basketball_hoop"}},
-  {"label":"Toilettes","tags":{"amenity":"toilets"}}
-]

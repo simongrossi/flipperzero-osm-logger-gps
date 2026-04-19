@@ -217,3 +217,69 @@ void storage_write_all_formats(
 
     furi_record_close(RECORD_STORAGE);
 }
+
+uint32_t storage_count_saved_points(void) {
+    const char* path = "/ext/apps_data/osm_logger/points.jsonl";
+    Storage* s = furi_record_open(RECORD_STORAGE);
+    uint32_t count = 0;
+
+    File* f = storage_file_alloc(s);
+    if(f && storage_file_open(f, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        char chunk[256];
+        uint16_t read;
+        do {
+            read = storage_file_read(f, chunk, sizeof(chunk));
+            for(uint16_t i = 0; i < read; i++) {
+                if(chunk[i] == '\n') count++;
+            }
+        } while(read > 0);
+        storage_file_close(f);
+    }
+    if(f) storage_file_free(f);
+
+    furi_record_close(RECORD_STORAGE);
+    return count;
+}
+
+static const char TRACK_HEADER[] =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "<gpx version=\"1.1\" creator=\"Flipper Zero OSM Logger\" "
+    "xmlns=\"http://www.topografix.com/GPX/1/1\">\n"
+    "<trk><name>Track</name>\n"
+    "<trkseg>\n";
+static const char TRACK_FOOTER[] = "</trkseg>\n</trk>\n</gpx>\n";
+
+void storage_append_trkpt(float lat, float lon, float altitude, bool new_segment) {
+    Storage* s = furi_record_open(RECORD_STORAGE);
+    if(!ensure_dir(s)) {
+        furi_record_close(RECORD_STORAGE);
+        return;
+    }
+
+    DateTime dt;
+    furi_hal_rtc_get_datetime(&dt);
+    char iso[32];
+    snprintf(
+        iso,
+        sizeof(iso),
+        "%04u-%02u-%02uT%02u:%02u:%02uZ",
+        dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+
+    char pt[192];
+    snprintf(
+        pt,
+        sizeof(pt),
+        "  <trkpt lat=\"%.6f\" lon=\"%.6f\"><ele>%.1f</ele><time>%s</time></trkpt>\n",
+        (double)lat, (double)lon, (double)altitude, iso);
+
+    write_append_framed(
+        s,
+        "/ext/apps_data/osm_logger/track.gpx",
+        TRACK_HEADER,
+        pt,
+        new_segment ? "</trkseg>\n<trkseg>\n" : NULL,
+        TRACK_FOOTER,
+        sizeof(TRACK_FOOTER) - 1);
+
+    furi_record_close(RECORD_STORAGE);
+}

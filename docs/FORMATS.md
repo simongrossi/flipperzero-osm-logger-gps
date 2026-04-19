@@ -19,7 +19,7 @@ Une ligne JSON par point sauvegardé :
 | `hdop` | number   | HDOP au moment du save (2 → 4 m, 1 → 2 m, 5+ = douteux)         |
 | `sats` | integer  | Nb de satellites utilisés pour le fix                           |
 | `tag`  | string   | Tag OSM formaté `key=value` (ex. `amenity=bench`)               |
-| `note` | string   | Note libre (toujours vide pour l'instant, éditeur non implémenté)|
+| `note` | string   | Note courte saisie via l'éditeur TextInput (Up dans Quick Log), chaîne vide sinon |
 
 **Point forcé** (OK long sans fix) : `lat=0`, `lon=0`, `alt=0`, `hdop=99.9` → ignorer ces points au post-traitement si besoin.
 
@@ -73,6 +73,25 @@ Le script [scripts/jsonl_to_geojson.py](../scripts/jsonl_to_geojson.py) reste di
 python3 scripts/jsonl_to_geojson.py points.jsonl > points_from_jsonl.geojson
 ```
 
-## Pas encore produit par l'app
+## `track.gpx` — Mode trace (auto-log GPX)
 
-- **Tracks GPX** (log auto en mouvement pour enregistrer un parcours). Seuls les waypoints sont implémentés.
+Écrit par le **Mode trace** du menu principal. Un timer périodique (5 s) ajoute un `<trkpt>` à chaque tick tant que la vue est active et qu'un fix GPS est disponible. Chaque entrée dans le mode trace démarre un nouveau `<trkseg>` (segment), ce qui permet à JOSM/QGIS de ne pas tracer de ligne entre deux sessions de tracking pausées.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Flipper Zero OSM Logger" xmlns="http://www.topografix.com/GPX/1/1">
+<trk><name>Track</name>
+<trkseg>
+  <trkpt lat="48.431234" lon="-0.093210"><ele>45.2</ele><time>2026-04-19T08:45:00Z</time></trkpt>
+  <trkpt lat="48.431267" lon="-0.093185"><ele>45.3</ele><time>2026-04-19T08:45:05Z</time></trkpt>
+</trkseg>
+<trkseg>
+  <trkpt lat="48.432000" lon="-0.094000"><ele>47.0</ele><time>2026-04-19T08:55:00Z</time></trkpt>
+</trkseg>
+</trk>
+</gpx>
+```
+
+Même stratégie **write-append-framed** que `points.gpx` : le fichier reste valide XML après chaque trkpt écrit, même en cas de coupure d'alim.
+
+Usage typique : activer le mode trace avant de démarrer un trajet à vélo, laisser tourner. À l'arrivée, importer `track.gpx` dans JOSM ou un visualiseur pour voir le parcours, et ajouter tes waypoints OSM par-dessus.

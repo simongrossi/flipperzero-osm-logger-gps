@@ -1,0 +1,27 @@
+# Format : un preset par ligne : label;key;value[,variant1,variant2,...]
+# - Lignes vides et lignes commençant par # ignorées.
+# - Séparateur strict : ';' entre les 3 champs (sans espace)
+# - Plusieurs valeurs séparées par ',' = variantes, cyclables avec </> dans Quick Log
+# - Label <= 18 caractères, pas d'accents.
+# - Copier ce fichier sur la microSD sous /ext/apps_data/osm_logger/presets.txt
+#   pour remplacer la liste par défaut compilée dans l'app.
+#
+# Max 8 variantes par preset, max 64 presets au total, fichier <= 4 Ko.
+# Pour trouver les bonnes clés/valeurs OSM : https://taginfo.openstreetmap.org/
+
+Banc;amenity;bench
+Poubelle;amenity;waste_basket
+# Exemple avec variantes : </> cyclera entre drinking_water et fountain
+Fontaine;amenity;drinking_water,fountain
+Toilettes;amenity;toilets
+Parking velo;amenity;bicycle_parking
+Parking auto;amenity;parking,motorcycle_parking
+Recyclage;amenity;recycling
+Defibrillateur;emergency;defibrillator
+Boite aux lettres;amenity;post_box
+Aire de jeux;leisure;playground
+Borne de charge;amenity;charging_station
+Lampadaire;highway;street_lamp
+Arret de bus;highway;bus_stop
+Panier de basket;amenity;basketball_hoop
+Cafe;amenity;cafe,pub,bar,fast_food

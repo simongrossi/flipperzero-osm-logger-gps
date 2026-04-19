@@ -1,6 +1,7 @@
 #pragma once
 #include <furi.h>
 #include <gui/modules/submenu.h>
+#include <gui/modules/text_input.h>
 #include <gui/view_dispatcher.h>
 #include <input/input.h>
 #include <notification/notification.h>
@@ -18,6 +19,7 @@ typedef struct App {
     ViewDispatcher* dispatcher;
     Submenu* menu;           // menu principal
     Submenu* preset_menu;    // liste des presets OSM
+    TextInput* note_input;   // éditeur de note courte
     NotificationApp* notification;
 
     // Expansion service (désactivé le temps qu'on utilise l'UART GPS)
@@ -34,6 +36,7 @@ typedef struct App {
     float altitude;       // mètres au-dessus du geoïde (GGA)
     uint8_t sats;
     uint32_t last_fix_tick; // furi_get_tick() du dernier fix reçu (0 = jamais)
+    bool pending_fix_notify; // posé en ISR à la transition no-fix -> fix, consommé dans le tick
 
     // Vue Quick Log
     View* quick_view;
@@ -45,23 +48,37 @@ typedef struct App {
     // Note rapide optionnelle
     char quick_note[64];
 
-    // Preset courant (index dans PRESETS, défini dans quick_log.c)
+    // Preset courant (index dans presets_get()) + variante active au sein de ce preset
     uint8_t current_preset;
+    uint8_t current_variant;
 
     // Compteur de points sauvegardés depuis le démarrage de l'app
     uint16_t session_count;
+
+    // Total cumulatif de points dans points.jsonl (rechargé au démarrage)
+    uint32_t total_count;
+
+    // --- Mode trace ---
+    View* track_view;
+    FuriTimer* track_timer;
+    uint32_t track_points;
+    uint32_t track_start_tick;
+    bool track_new_segment;
+
+    // --- Statut GPS ---
+    View* status_view;
+
+    // --- About ---
+    View* about_view;
 } App;
 
 typedef enum {
     AppViewMenu = 0,
     AppViewPresets = 1,
     AppViewQuickLog = 2,
+    AppViewTrack = 3,
+    AppViewStatus = 4,
+    AppViewNote = 5,
+    AppViewAbout = 6,
 } AppView;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-void app_show_status(App* app);
-#ifdef __cplusplus
-}
-#endif

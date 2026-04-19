@@ -11,17 +11,26 @@
 ## ✨ Fonctionnalités
 
 - Lecture GPS **NMEA 0183** (RMC + GGA) via UART 9600
-- Écran **Statut GPS** : fix, lat/lon, HDOP, satellites (LED + son selon fix)
-- **Mode Rapide** :
-  - Sous-menu de **23 presets OSM** classés par catégorie (mobilier urbain, voirie, stationnement, commerces, urgence…)
-  - Écran live : coordonnées, altitude, HDOP, satellites, âge du dernier fix, compteur de points session
+- **Notification auto** à l'acquisition d'un fix (vibration + LED verte)
+- Écran **Statut GPS** dédié : fix, lat/lon, altitude, HDOP, satellites, âge du fix
+- **Mode Rapide (waypoints)** :
+  - Sous-menu de **23 presets OSM** par défaut, classés par catégorie (mobilier, voirie, commerces, urgence…)
+  - Presets **remplaçables sans recompiler** : copier un `presets.txt` sur la SD
+  - **Variantes par preset** (ex. Café / Pub / Bar / Fast food) cyclables avec `←`/`→`
+  - **Éditeur de note** courte via `Up` (Flipper TextInput), `Down` pour l'effacer
+  - Écran live : coordonnées, altitude, HDOP, satellites, âge du fix, compteur session + total cumulatif
   - **`OK` court** : sauvegarde si `fix OK` et `HDOP ≤ 2.5`, sinon son d'erreur
-  - **`OK` long** : force la sauvegarde quel que soit le fix (utile en canyon urbain)
-- Sauvegarde dans `/ext/apps_data/osm_logger/` en **4 formats natifs** (tous valides à tout moment) :
-  - `points.jsonl` — 1 ligne JSON / point, format dense
+  - **`OK` long** : force la sauvegarde quel que soit le fix
+- **Mode Trace (auto-log GPX)** :
+  - `<trkpt>` écrit toutes les 5 s quand la vue est active et qu'un fix est dispo
+  - Chaque session démarre un nouveau `<trkseg>` (pas de ligne fictive entre deux sessions)
+  - Idéal pour mapper une rue/route en marchant ou à vélo
+- Sauvegarde dans `/ext/apps_data/osm_logger/` en **5 formats natifs** (tous valides à tout moment) :
+  - `points.jsonl` — 1 ligne JSON / point
   - `notes.csv` — tableur
   - `points.gpx` — GPX 1.1 avec waypoints, import direct JOSM/iD
   - `points.geojson` — FeatureCollection, import direct QGIS/geojson.io
+  - `track.gpx` — GPX track en `<trkseg>`, import dans tout viewer GPX
 - Compatible Flipper **firmware stock** et **Momentum** (gère automatiquement le conflit UART avec le service Expansion)
 
 ---
@@ -74,6 +83,9 @@ ufbt launch
 |-------------|--------------------------------------------------------------|
 | `OK` court  | Enregistrer si fix OK et HDOP ≤ 2.5 (sinon son d'erreur)     |
 | `OK` long   | Forcer l'enregistrement même sans fix ou avec HDOP dégradé   |
+| `←` / `→`   | Changer de variante (si le preset a plusieurs valeurs)       |
+| `Up`        | Ouvrir l'éditeur de note (TextInput Flipper)                 |
+| `Down`      | Effacer la note courante                                     |
 | `Back`      | Retour à la liste des presets                                |
 
 5. En fin de session, récupérer les fichiers via qFlipper ou mode storage USB :
@@ -87,12 +99,12 @@ Le menu principal propose aussi `Statut GPS` qui déclenche un log système + vi
 ### Anatomie de l'écran Quick Log
 
 ```
-        Banc              <- preset sélectionné
-     amenity=bench        <- tag OSM
-   48.43123, -0.09321     <- coords (lat, lon)
-   HDOP=1.3 sats=9  #12   <- qualité + compteur session
-   alt=45m  fix=3s        <- altitude + âge du fix
-  OK save  Hold=force     <- rappel touches
+     < Cafe 2/4 >          <- preset + variante courante si >1
+     amenity=pub           <- tag OSM effectif (dépend de la variante)
+    48.43123, -0.09321     <- coords live (lat, lon)
+    HDOP=1.3 sats=9  #12   <- qualité + compteur session
+    alt=45m fix=3s  t=247  <- altitude, âge du fix, total cumulatif
+  OK save  Up:note  <>:variant   <- rappel touches (ou "note: ..." si renseignée)
 ```
 
 ---
@@ -100,9 +112,10 @@ Le menu principal propose aussi `Statut GPS` qui déclenche un log système + vi
 ## 📚 Documentation
 
 - **[docs/HARDWARE.md](docs/HARDWARE.md)** — modules GPS supportés, câblage détaillé, premier fix, diagnostic "pas de données NMEA"
-- **[docs/FORMATS.md](docs/FORMATS.md)** — specs des fichiers JSONL/CSV, champs par champ, post-traitement
+- **[docs/FORMATS.md](docs/FORMATS.md)** — specs des fichiers JSONL/CSV/GPX/GeoJSON/track, champ par champ
 - **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — structure du code, ajouter un preset, ajouter une vue, debug, pièges connus
-- **[src/presets.c](src/presets.c)** — liste complète des 23 presets (éditable, recompilation requise)
+- **[docs/ROADMAP.md](docs/ROADMAP.md)** — features pas encore implémentées (avec pistes d'implémentation)
+- **[src/presets.c](src/presets.c)** — liste des 23 presets par défaut (éditable en recompilant, ou override via `presets.txt` sur la SD)
 
 ---
 
@@ -115,13 +128,17 @@ Le menu principal propose aussi `Statut GPS` qui déclenche un log système + vi
 
 ---
 
-## 🚧 Pas encore implémenté
+## 🚧 Roadmap
 
-- **Mode trace GPX** (log auto périodique pour enregistrer un parcours en déplacement).
-- **Éditeur de note** on-device (text input custom).
-- **Chargement dynamique de `presets.json`** depuis la microSD.
-- **Variantes de preset** via ←/→ (ex. `bench` + `material=wood`).
-- **Support autres modules GPS** (PA1010D, BN-180 — devrait fonctionner mais non testé).
+Pour la liste détaillée des features pas encore implémentées avec pistes d'implémentation, voir **[docs/ROADMAP.md](docs/ROADMAP.md)**.
+
+Résumé des gros morceaux restants :
+- Icône custom dans le launcher
+- Intervalle de trace configurable (5 s aujourd'hui)
+- Variantes = tags additionnels (aujourd'hui seulement valeurs alternatives)
+- Sous-catégories dans le menu de presets
+- Note persistante entre sessions
+- Support d'autres modules GPS (PA1010D, BN-180, etc.)
 
 ---
 
