@@ -18,6 +18,8 @@ typedef struct {
     uint8_t sats;
     uint32_t fix_age_s;
     bool fix_ever;
+    uint32_t nmea_bytes_rx;
+    uint32_t nmea_lines_rx;
 } StatusModel;
 
 static void status_draw_callback(Canvas* canvas, void* ctx) {
@@ -59,12 +61,20 @@ static void status_draw_callback(Canvas* canvas, void* ctx) {
         snprintf(line3, sizeof(line3), "sats=%u  fix=never", m->sats);
     }
 
-    elements_multiline_text_aligned(canvas, 64, 20, AlignCenter, AlignTop, line1);
-    elements_multiline_text_aligned(canvas, 64, 32, AlignCenter, AlignTop, line2);
-    elements_multiline_text_aligned(canvas, 64, 44, AlignCenter, AlignTop, line3);
+    char line4[48];
+    snprintf(
+        line4,
+        sizeof(line4),
+        "NMEA: %lu B / %lu lines",
+        (unsigned long)m->nmea_bytes_rx,
+        (unsigned long)m->nmea_lines_rx);
 
-    elements_multiline_text_aligned(
-        canvas, 64, 62, AlignCenter, AlignBottom, "Back: menu");
+    elements_multiline_text_aligned(canvas, 64, 18, AlignCenter, AlignTop, line1);
+    elements_multiline_text_aligned(canvas, 64, 28, AlignCenter, AlignTop, line2);
+    elements_multiline_text_aligned(canvas, 64, 38, AlignCenter, AlignTop, line3);
+    elements_multiline_text_aligned(canvas, 64, 48, AlignCenter, AlignTop, line4);
+
+    elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, "Back");
 }
 
 static bool status_input_callback(InputEvent* event, void* ctx) {
@@ -108,6 +118,8 @@ void status_refresh(App* app) {
             m->sats = app->sats;
             m->fix_age_s = age_s;
             m->fix_ever = fix_ever;
+            m->nmea_bytes_rx = app->nmea_bytes_rx;
+            m->nmea_lines_rx = app->nmea_lines_rx;
         },
         true);
 }

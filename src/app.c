@@ -63,10 +63,12 @@ static void serial_rx_callback(FuriHalSerialHandle* handle, FuriHalSerialRxEvent
     if(event & FuriHalSerialRxEventData) {
         while(furi_hal_serial_async_rx_available(app->serial)) {
             uint8_t c = furi_hal_serial_async_rx(app->serial);
+            app->nmea_bytes_rx++;
 
             if(c == '\n' || c == '\r') {
                 if(app->nmea_pos > 0) {
                     app->nmea_line[app->nmea_pos] = '\0';
+                    app->nmea_lines_rx++;
 
                     bool has_fix = false;
                     float lat = 0, lon = 0, hdop = 99.9f, altitude = 0;

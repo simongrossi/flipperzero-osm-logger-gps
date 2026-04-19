@@ -45,6 +45,10 @@ typedef struct App {
     char nmea_line[GPS_RX_BUF_SIZE];
     size_t nmea_pos;
 
+    // Diagnostics UART (incrémentés en ISR)
+    uint32_t nmea_bytes_rx;  // total octets reçus
+    uint32_t nmea_lines_rx;  // total lignes NMEA parsées
+
     // Note rapide optionnelle
     char quick_note[64];
 
