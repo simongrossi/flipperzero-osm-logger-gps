@@ -22,7 +22,7 @@
 - **Quick Log (waypoints)** mode:
   - Navigation in **two levels**: pick a category → pick a preset inside
   - **65 OSM presets** by default grouped in 15 categories (Street furniture, Roads & signs, Parking, Sports & leisure, Waste, Shops, Services, Emergency, Tourism, Nature, Education, Religion, Transport, Address, Other)
-  - **SD-loadable presets**: drop a `presets.txt` on the SD to replace the built-in list without recompiling
+  - **SD-loadable presets**: drop a `presets.txt` on the SD to replace the built-in list without recompiling (up to 128 presets). A helper script [`scripts/build_presets.py`](scripts/build_presets.py) generates such a file from the **official OSM [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema)** (hundreds of community-maintained presets, multi-lingual translations). See [docs/CUSTOM_PRESETS.en.md](docs/CUSTOM_PRESETS.en.md) · [docs/CUSTOM_PRESETS.md](docs/CUSTOM_PRESETS.md).
   - **Preset variants** cyclable with `←` / `→` — alternative values *or* additional secondary tags (e.g. `Bench` → `amenity=bench` → `amenity=bench;material=wood`)
   - **Short note editor** via `Up` (Flipper TextInput), `Down` to clear
   - Live screen: coords, altitude, HDOP, sats, fix age, session + cumulative counters
@@ -157,9 +157,11 @@ Direct links:
 - Hardware & wiring: 🇬🇧 [HARDWARE.en.md](docs/HARDWARE.en.md) · 🇫🇷 [HARDWARE.md](docs/HARDWARE.md)
 - Output formats: 🇬🇧 [FORMATS.en.md](docs/FORMATS.en.md) · 🇫🇷 [FORMATS.md](docs/FORMATS.md)
 - OSM beginner tutorial: 🇬🇧 [GETTING_STARTED_OSM.en.md](docs/GETTING_STARTED_OSM.en.md) · 🇫🇷 [GETTING_STARTED_OSM.md](docs/GETTING_STARTED_OSM.md)
+- Custom presets (SD override + iD schema importer): 🇬🇧 [CUSTOM_PRESETS.en.md](docs/CUSTOM_PRESETS.en.md) · 🇫🇷 [CUSTOM_PRESETS.md](docs/CUSTOM_PRESETS.md)
 - Developer docs (French only for now): [DEVELOPMENT.md](docs/DEVELOPMENT.md), [ROADMAP.md](docs/ROADMAP.md)
 - [src/presets.c](src/presets.c) — the 65 default presets (editable by rebuilding, or override via `presets.txt` on SD)
 - [presets.txt.sample](presets.txt.sample) — sample presets file (in French, shows the syntax)
+- [scripts/build_presets.py](scripts/build_presets.py) — generate a `presets.txt` from the official OSM [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema) (hundreds of community-maintained presets, multi-lingual). See [docs/CUSTOM_PRESETS.en.md](docs/CUSTOM_PRESETS.en.md).
 
 ---
 

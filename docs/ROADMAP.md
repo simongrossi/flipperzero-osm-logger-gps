@@ -40,8 +40,8 @@ Série de points consécutifs formant un chemin (sentier, clôture, ligne élect
 ### Building outlines
 Enregistrer les 4 (ou N) coins d'un bâtiment → polygone OSM `<way>` avec `building=yes`. Mode dédié "cliquer aux 4 coins".
 
-### Import schema iD (id-tagging-schema)
-Parser le JSON officiel iD (100+ presets avec noms multi-lingues, icônes, suggestions de tags). Énorme gain de richesse.
+### ~~Import schema iD (id-tagging-schema)~~ ✅ v0.13 (tooling)
+Fait via le script Python `scripts/build_presets.py` qui télécharge `presets.json` depuis le dépôt officiel, filtre les presets point, mappe vers nos 15 catégories, charge les traductions pour la locale demandée et émet un `presets.txt` compatible. Docs : [CUSTOM_PRESETS.md](CUSTOM_PRESETS.md). Intégration runtime côté Flipper (parsing des icônes iD, suggestions de tags secondaires) reste à faire si un jour utile.
 
 ### MapComplete quick-link
 À chaque save, ajouter dans le JSONL une URL MapComplete qui ouvre la vue sur ce point. Permet vérification visuelle rapide au post-traitement.

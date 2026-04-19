@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.13 (tooling) — 2026-04-19
+
+### Added
+- **`scripts/build_presets.py`** — générateur de `presets.txt` depuis le schéma officiel OSM [id-tagging-schema](https://github.com/openstreetmap/id-tagging-schema) (celui utilisé par l'éditeur iD). Télécharge le `presets.json` maintenu par la communauté, filtre les POIs point, mappe vers nos 15 catégories via une table `CATEGORY_RULES` customisable, normalise les labels (ASCII, 18 chars, déaccentuation NFD), et émet un fichier compatible avec le loader SD de l'app. CLI : `--locale` (en/fr/de/es/…), `--max`, `-o`, `--input` (mode hors-ligne), `--stats`. Python 3.8+ stdlib uniquement, zéro dépendance externe.
+- **Docs bilingues** `docs/CUSTOM_PRESETS.md` (FR) + `docs/CUSTOM_PRESETS.en.md` (EN) expliquant les deux méthodes (édition manuelle du `presets.txt` + script iD). Ajoute la page au `docs/README.md`.
+- **README principal** : mention du script + lien vers les nouvelles docs, dans la section Features et la section Documentation.
+
+### Rationale
+Notre liste compilée de 65 presets est bonne pour démarrer mais plafonne vite en cartographie thématique (EV chargers, mobilier cyclable, pharmacies de nuit…). Le schéma iD contient 100+ presets par catégorie en 30+ langues, maintenu par la community. Permettre aux utilisateurs de régénérer leur `presets.txt` depuis cette source canonique :
+- Élargit drastiquement la palette sans bloater l'app (fichier SD, pas de recompile).
+- Donne gratuitement les traductions multilingues.
+- Permet aux contributeurs de proposer des nouveaux tags "depuis le terrain" via PR sur id-tagging-schema → bénéfice pour tout OSM.
+
+Pas de bump `fap_version` : aucun code Flipper modifié. Tooling + docs uniquement.
+
 ## 0.13 — 2026-04-19
 
 ### Added

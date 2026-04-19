@@ -9,6 +9,7 @@ Pick your language / Choisis ta langue :
 | [Hardware & wiring](HARDWARE.en.md) | [Matériel & câblage](HARDWARE.md) |
 | [Output formats](FORMATS.en.md) | [Formats de sortie](FORMATS.md) |
 | [OSM beginner tutorial](GETTING_STARTED_OSM.en.md) | [Tutoriel OSM débutant](GETTING_STARTED_OSM.md) |
+| [Custom presets (SD override + iD schema)](CUSTOM_PRESETS.en.md) | [Presets personnalisés (override SD + schéma iD)](CUSTOM_PRESETS.md) |
 
 ## Developer docs / Docs développeur
 
