@@ -47,12 +47,14 @@ static void status_draw_callback(Canvas* canvas, void* ctx) {
 
     if(m->has_fix) {
         snprintf(line1, sizeof(line1), "%.6f, %.6f", (double)m->lat, (double)m->lon);
+        float prec_m = m->hdop * 3.0f;
         snprintf(
             line2,
             sizeof(line2),
-            "alt=%.1fm HDOP=%.1f",
+            "alt=%.1fm HDOP=%.1f ~%.0fm",
             (double)m->altitude,
-            (double)m->hdop);
+            (double)m->hdop,
+            (double)prec_m);
     } else {
         snprintf(line1, sizeof(line1), "--, --");
         snprintf(line2, sizeof(line2), "alt=-- HDOP=--");

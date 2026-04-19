@@ -230,18 +230,25 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     elements_multiline_text_aligned(canvas, 64, y_coords, AlignCenter, AlignTop, line1);
     elements_multiline_text_aligned(canvas, 64, y_hdop, AlignCenter, AlignTop, line2);
 
-    // Ligne altitude + age du fix + total
+    // Ligne altitude + précision estimée + total
+    // prec_m ≈ HDOP * 3 : approximation courante pour les modules ublox
+    // (User Equivalent Range Error ~3 m en conditions normales, multiplié par HDOP).
     char line3[56];
-    if(m->fix_ever) {
+    if(m->fix_ever && m->has_fix) {
+        float prec_m = m->hdop * 3.0f;
         snprintf(
-            line3,
-            sizeof(line3),
+            line3, sizeof(line3),
+            "alt=%.0fm prec=%.0fm t=%lu",
+            (double)m->altitude, (double)prec_m, (unsigned long)m->total_count);
+    } else if(m->fix_ever) {
+        // Fix stale (hystérésis 5s) : précision probablement fausse, affiche fix age
+        snprintf(
+            line3, sizeof(line3),
             "alt=%.0fm fix=%lus  t=%lu",
-            (double)m->altitude,
-            (unsigned long)m->fix_age_s,
+            (double)m->altitude, (unsigned long)m->fix_age_s,
             (unsigned long)m->total_count);
     } else {
-        snprintf(line3, sizeof(line3), "alt=-- fix=--  t=%lu", (unsigned long)m->total_count);
+        snprintf(line3, sizeof(line3), "alt=-- prec=-- t=%lu", (unsigned long)m->total_count);
     }
     elements_multiline_text_aligned(canvas, 64, y_alt, AlignCenter, AlignTop, line3);
 
@@ -331,9 +338,21 @@ static bool quick_log_do_save(App* app, bool force) {
     if(!p) p = presets_get(0);
     if(!p) return false;
 
-    bool quality_ok = app->has_fix && (app->hdop <= HDOP_MAX);
+    // "Fix effectif" = on considère qu'on a un fix si un fix a été reçu dans
+    // les 5 dernières secondes (même logique que l'affichage). Évite de
+    // refuser un save juste parce que la trame RMC en cours dit V alors que
+    // les GGA d'avant/après sont valides.
+    bool recent_fix = false;
+    if(app->last_fix_tick != 0) {
+        uint32_t freq = furi_kernel_get_tick_frequency();
+        if(freq == 0) freq = 1;
+        uint32_t age_ticks = furi_get_tick() - app->last_fix_tick;
+        recent_fix = (age_ticks < 5 * freq);
+    }
+    bool effective_fix = app->has_fix || recent_fix;
+    bool quality_ok = effective_fix && (app->hdop <= HDOP_MAX);
     if(!quality_ok && !force) {
-        if(!app->has_fix) {
+        if(!effective_fix) {
             snprintf(app->last_error, sizeof(app->last_error),
                      "No GPS fix\nHold OK to force");
         } else {
@@ -385,9 +404,13 @@ static void averaging_cancel(App* app) {
 }
 
 // Collecte un sample si un nouveau fix est arrivé depuis le dernier tick.
+// On se base uniquement sur le changement de last_fix_tick (qui n'avance QUE
+// quand has_fix passe à true) — pas besoin de vérifier has_fix maintenant,
+// c'est déjà implicite. Ça évite de manquer des samples à cause du flip-flop
+// RMC(V)/GGA(q>0) qui fait osciller has_fix à 2 Hz.
 static void averaging_tick(App* app) {
     if(!app->averaging) return;
-    if(app->has_fix && app->last_fix_tick != app->avg_last_sampled_fix_tick) {
+    if(app->last_fix_tick != 0 && app->last_fix_tick != app->avg_last_sampled_fix_tick) {
         app->avg_lat_sum += (double)app->lat;
         app->avg_lon_sum += (double)app->lon;
         if(app->hdop < app->avg_min_hdop) app->avg_min_hdop = app->hdop;

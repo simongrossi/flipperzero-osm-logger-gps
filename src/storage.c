@@ -568,22 +568,24 @@ bool storage_pre_save_check(char* err, size_t err_size) {
     Storage* s = furi_record_open(RECORD_STORAGE);
     bool ok = true;
 
-    FileInfo fi;
-    if(storage_common_stat(s, "/ext", &fi) != FSE_OK) {
-        if(err) snprintf(err, err_size, "SD card not found");
+    // API canonique pour vérifier la SD (plus fiable que storage_common_stat("/ext"))
+    FS_Error sd = storage_sd_status(s);
+    if(sd != FSE_OK) {
+        if(err) snprintf(err, err_size, "SD card: %s", storage_error_get_desc(sd));
         ok = false;
         goto end;
     }
 
-    if(storage_common_stat(s, "/ext/apps_data/osm_logger", &fi) != FSE_OK) {
-        FS_Error r = storage_common_mkdir(s, "/ext/apps_data/osm_logger");
-        if(r != FSE_OK && r != FSE_EXIST) {
-            if(err) snprintf(err, err_size, "Cannot create folder");
-            ok = false;
-            goto end;
-        }
+    // Test définitif de l'accès disque : tente mkdir (FSE_EXIST = OK aussi).
+    // Si ça échoue avec autre chose, on a un vrai problème SD.
+    FS_Error r = storage_common_mkdir(s, "/ext/apps_data/osm_logger");
+    if(r != FSE_OK && r != FSE_EXIST) {
+        if(err) snprintf(err, err_size, "SD error: %s", storage_error_get_desc(r));
+        ok = false;
+        goto end;
     }
 
+    // Espace libre (non-bloquant : si l'API échoue, on laisse passer)
     uint64_t total = 0, freeb = 0;
     if(storage_common_fs_info(s, "/ext", &total, &freeb) == FSE_OK) {
         if(freeb < 10240u) {

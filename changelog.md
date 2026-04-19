@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10 — 2026-04-19
+
+Itération de polish suite aux premiers tests terrain.
+
+### Added
+- **Précision en mètres affichée à l'écran** (plutôt que seulement HDOP qui est dimensionless). Sur Quick Log : `alt=45m prec=4m t=247` quand fix actif. Sur GPS Status : `alt=45m HDOP=1.3 ~4m`. Formule : `prec_m ≈ HDOP × 3` (approximation courante pour les modules ublox en conditions normales).
+
+### Fixed
+- **Save refusé avec "No GPS fix" alors que les coords étaient affichées à l'écran** : le chemin save utilisait `app->has_fix` brut (flip-flop à 2 Hz à cause de RMC V / GGA q>0) pendant que l'affichage utilisait l'hystérésis 5s. Résultat : le clic OK tombait parfois pile sur une trame RMC V et refusait. Corrigé en utilisant la même logique "fix effectif" (has_fix OU fix dans les 5 dernières secondes) pour le save et pour l'averaging.
+- **Averaging perdait la moitié des samples** pour la même raison (condition `app->has_fix` dans `averaging_tick`). Maintenant déclenché sur le changement de `last_fix_tick` seul → 2× plus de samples collectés sur une même durée.
+- **"SAVE FAILED / SD card not found" alors que la SD est en place** : `storage_pre_save_check` utilisait `storage_common_stat(s, "/ext", &fi)` qui peut échouer sur le mount point même avec la SD mountée. Remplacé par `storage_sd_status(s)` qui est l'API canonique Flipper pour tester la SD, + un test réel via `storage_common_mkdir` (si mkdir réussit, la SD est forcément accessible).
+
 ## 0.9 — 2026-04-19
 
 Grosse itération qualité de vie pour l'utilisation terrain. Focus : stabiliser l'affichage GPS + donner du contexte au utilisateur + introduire le mode averaging pour des positions de niveau OSM.
