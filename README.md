@@ -29,6 +29,7 @@
   - `<trkpt>` written every N seconds while the view is active and a fix is available
   - Distance filter: skips points that didn't move far enough (configurable threshold)
   - Heading / course over ground displayed live
+  - **Live stats on screen**: session duration, points count, cumulative distance, instant speed, max speed
   - Each session starts a new `<trkseg>` (no bogus line between separate sessions)
   - Ideal for mapping a street or path on foot or bike
 - **Last points browser** (main menu entry): scrollable list of the 10 most recent saves. Tap any point to see full details (time, coords, altitude, HDOP, sats, tag, note). Actions: **Delete last** (undo across all 4 output files) and **Clear all** (new session).

@@ -100,11 +100,14 @@ static void serial_rx_callback(FuriHalSerialHandle* handle, FuriHalSerialRxEvent
 
                     bool has_fix = false;
                     float lat = 0, lon = 0, hdop = 99.9f, altitude = 0;
-                    float heading = app->heading_deg; // garde la dernière valeur si la trame ne la fournit pas
+                    // Garde la dernière valeur si la trame ne les fournit pas
+                    float heading = app->heading_deg;
+                    float speed_kts = app->speed_knots;
                     uint8_t sats = 0;
 
                     nmea_parse_line(
-                        app->nmea_line, &has_fix, &lat, &lon, &hdop, &sats, &altitude, &heading);
+                        app->nmea_line, &has_fix, &lat, &lon, &hdop, &sats, &altitude,
+                        &heading, &speed_kts);
 
                     bool was_fix = app->has_fix;
                     app->has_fix = has_fix;
@@ -113,6 +116,7 @@ static void serial_rx_callback(FuriHalSerialHandle* handle, FuriHalSerialRxEvent
                     app->hdop = hdop;
                     app->altitude = altitude;
                     app->heading_deg = heading;
+                    app->speed_knots = speed_kts;
                     app->sats = sats;
                     // Anti-fantôme : un "fix" sans coords réelles ne compte pas
                     bool real_fix = has_fix && (lat != 0.0f || lon != 0.0f);

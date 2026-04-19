@@ -121,7 +121,8 @@ void nmea_parse_line(
     float* hdop,
     uint8_t* sats,
     float* altitude,
-    float* heading_deg) {
+    float* heading_deg,
+    float* speed_knots) {
     if(!line) return;
 
     if(has_fix) *has_fix = false;
@@ -145,6 +146,9 @@ void nmea_parse_line(
                     float lonv = nmea_degmin_to_deg_str(f[5].p, f[5].len);
                     if(f[6].len == 1 && (f[6].p[0] == 'W' || f[6].p[0] == 'w')) lonv = -lonv;
                     *lon = lonv;
+                }
+                if(speed_knots && nf >= 8 && f[7].len) {
+                    *speed_knots = parse_float_simple(f[7].p, f[7].len);
                 }
                 if(heading_deg && nf >= 9 && f[8].len) {
                     *heading_deg = parse_float_simple(f[8].p, f[8].len);

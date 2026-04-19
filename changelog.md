@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6 — 2026-04-19
+
+### Added
+- **Stats live en mode trace** : distance totale parcourue (cumul haversine entre trkpts), vitesse instantanée (depuis `$GPRMC` champ 7 — nœuds convertis en km/h), vitesse max observée dans la session. Affichées en 2 lignes sur l'écran Track.
+- **GitHub Actions CI** : workflow `.github/workflows/build.yml` qui build l'app contre les canaux Release et RC du firmware Flipper à chaque push/PR, avec upload de l'artefact `.fap`.
+- **Parser NMEA étendu** : extrait maintenant la vitesse depuis RMC champ 7.
+
+### Fixed
+- **Bloqueur runtime** : `atof` n'est plus dans l'API Flipper SDK 1.4.3 (désactivé). Remplacé par un `simple_atof` inline dans storage.c, évite l'erreur `MissingImports` au load de l'app.
+
 ## 0.5 — 2026-04-19
 
 ### Added

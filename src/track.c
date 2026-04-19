@@ -35,6 +35,9 @@ typedef struct {
     float hdop;
     float altitude;
     float heading_deg;
+    float speed_kmh;
+    float total_dist_m;
+    float max_speed_kmh;
     uint8_t sats;
     uint32_t points;
     uint32_t duration_s;
@@ -62,6 +65,9 @@ void track_refresh(App* app) {
             m->hdop = app->hdop;
             m->altitude = app->altitude;
             m->heading_deg = app->heading_deg;
+            m->speed_kmh = app->speed_knots * 1.852f;
+            m->total_dist_m = app->track_total_dist_m;
+            m->max_speed_kmh = app->track_max_speed_kmh;
             m->sats = app->sats;
             m->points = app->track_points;
             m->duration_s = duration;
@@ -86,6 +92,17 @@ static void track_timer_callback(void* ctx) {
             app->last_trk_lat, app->last_trk_lon, app->lat, app->lon);
         if(d < (float)min_dist) return;
     }
+
+    // Cumul de distance depuis le trkpt précédent (si on en a un et qu'on
+    // n'ouvre pas un nouveau segment)
+    if(app->last_trk_valid && !app->track_new_segment) {
+        app->track_total_dist_m += approx_distance_m(
+            app->last_trk_lat, app->last_trk_lon, app->lat, app->lon);
+    }
+
+    // Vitesse max : kmh = knots * 1.852
+    float kmh = app->speed_knots * 1.852f;
+    if(kmh > app->track_max_speed_kmh) app->track_max_speed_kmh = kmh;
 
     storage_append_trkpt(app->lat, app->lon, app->altitude, app->track_new_segment);
     app->track_new_segment = false;
@@ -119,17 +136,15 @@ static void track_draw_callback(Canvas* canvas, void* ctx) {
             line2,
             sizeof(line2),
             "HDOP=%.1f sats=%u hdg=%.0f\xb0",
-            (double)m->hdop,
-            m->sats,
-            (double)m->heading_deg);
+            (double)m->hdop, m->sats, (double)m->heading_deg);
     } else {
         snprintf(line1, sizeof(line1), "Waiting for fix...");
         snprintf(line2, sizeof(line2), "sats=%u", m->sats);
     }
-    // fall-through: Idle et REC déjà en anglais
-    elements_multiline_text_aligned(canvas, 64, 18, AlignCenter, AlignTop, line1);
-    elements_multiline_text_aligned(canvas, 64, 28, AlignCenter, AlignTop, line2);
+    elements_multiline_text_aligned(canvas, 64, 16, AlignCenter, AlignTop, line1);
+    elements_multiline_text_aligned(canvas, 64, 26, AlignCenter, AlignTop, line2);
 
+    // Ligne stats : pts + durée
     char line3[48];
     uint32_t h = m->duration_s / 3600;
     uint32_t min = (m->duration_s / 60) % 60;
@@ -138,7 +153,26 @@ static void track_draw_callback(Canvas* canvas, void* ctx) {
         line3, sizeof(line3), "pts=%lu  %02lu:%02lu:%02lu",
         (unsigned long)m->points,
         (unsigned long)h, (unsigned long)min, (unsigned long)s);
-    elements_multiline_text_aligned(canvas, 64, 42, AlignCenter, AlignTop, line3);
+    elements_multiline_text_aligned(canvas, 64, 36, AlignCenter, AlignTop, line3);
+
+    // Ligne stats : distance totale + vitesse inst + max
+    char line4[48];
+    if(m->total_dist_m >= 1000.0f) {
+        snprintf(
+            line4, sizeof(line4),
+            "%.2fkm v=%.0f max=%.0fkm/h",
+            (double)(m->total_dist_m / 1000.0f),
+            (double)m->speed_kmh,
+            (double)m->max_speed_kmh);
+    } else {
+        snprintf(
+            line4, sizeof(line4),
+            "%.0fm v=%.0f max=%.0fkm/h",
+            (double)m->total_dist_m,
+            (double)m->speed_kmh,
+            (double)m->max_speed_kmh);
+    }
+    elements_multiline_text_aligned(canvas, 64, 46, AlignCenter, AlignTop, line4);
 
     char footer[48];
     snprintf(
@@ -165,6 +199,8 @@ static void track_enter(void* ctx) {
     app->track_points = 0;
     app->track_start_tick = furi_get_tick();
     app->last_trk_valid = false;
+    app->track_total_dist_m = 0.0f;
+    app->track_max_speed_kmh = 0.0f;
 
     if(!app->track_timer) {
         app->track_timer =

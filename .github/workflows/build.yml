@@ -1,0 +1,44 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        channel: [release, rc]
+      fail-fast: false
+
+    runs-on: ubuntu-latest
+    name: Build against ${{ matrix.channel }} SDK
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ufbt
+        run: python3 -m pip install --upgrade ufbt
+
+      - name: Target ${{ matrix.channel }} firmware SDK
+        run: ufbt update --channel=${{ matrix.channel }}
+
+      - name: Build .fap
+        run: ufbt
+
+      - name: Upload artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osm_logger-${{ matrix.channel }}.fap
+          path: dist/osm_logger.fap
+          retention-days: 14

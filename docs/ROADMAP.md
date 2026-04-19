@@ -3,23 +3,15 @@
 Ce fichier liste tout ce qui reste à faire dans l'app, groupé par thème et priorité.
 
 **Pour un état "v1.0 catalogue-ready polished"**, la suite recommandée est (dans l'ordre) :
-1. Icônes dans le menu principal
-2. Stats live en mode trace (distance totale, vitesse moy/max)
-3. Détection de doublons OSM
-4. GitHub Actions CI
-5. Tests unitaires parser NMEA
+1. Icônes dans le menu principal (refactor Submenu → Menu module Flipper)
+2. Sous-catégories dans le sous-menu presets (2 niveaux)
+3. Export ZIP depuis l'app (ou tar, ou simple concat)
+4. Tests unitaires parser NMEA
+5. Note link to photo convention (déjà couvert par `auto_photo_id`, documenter OSM-side)
 
 ---
 
 ## 🎯 Haute priorité — UX terrain
-
-### Stats live en mode trace
-Ajouter à l'écran Track :
-- **Distance totale** parcourue (somme des segments haversine entre trkpts sauvegardés)
-- **Vitesse instantanée** depuis la trame NMEA RMC (champ 7 = speed over ground en nœuds)
-- **Vitesse moyenne / max** depuis le début de session
-
-Transforme le mode trace en vrai "GPS sport/mapping" plutôt que simple enregistreur. Le heading est déjà affiché depuis v0.3.
 
 ### Icônes dans le menu principal
 Le `Submenu` Flipper accepte un icône 10×10 par item via `submenu_add_item_ex` ou en définissant des ressources. 6 icônes à dessiner :

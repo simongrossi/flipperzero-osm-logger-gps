@@ -39,6 +39,7 @@ typedef struct App {
     float hdop;
     float altitude;       // mètres au-dessus du geoïde (GGA)
     float heading_deg;    // cap en degrés (course over ground, RMC)
+    float speed_knots;    // vitesse instantanée en nœuds (RMC champ 7)
     uint8_t sats;
     uint32_t last_fix_tick; // furi_get_tick() du dernier fix reçu (0 = jamais)
     uint32_t last_notify_tick; // dernier "fix acquired" notifié (cooldown anti-spam)
@@ -78,6 +79,9 @@ typedef struct App {
     float last_trk_lat;
     float last_trk_lon;
     bool last_trk_valid;
+    // Stats live
+    float track_total_dist_m;   // cumul de distance entre trkpts
+    float track_max_speed_kmh;  // vitesse max observée dans la session
 
     // --- Statut GPS ---
     View* status_view;

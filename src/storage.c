@@ -563,17 +563,42 @@ static float haversine_m(float lat1, float lon1, float lat2, float lon2) {
     return sqrtf(dlat * dlat + dlon * dlon);
 }
 
+// Parser atof minimaliste (atof est désactivé dans l'API Flipper).
+// Gère signe optionnel, chiffres, puis point décimal.
+static float simple_atof(const char* s) {
+    if(!s || !*s) return 0.0f;
+    float sign = 1.0f;
+    if(*s == '-') { sign = -1.0f; s++; }
+    else if(*s == '+') { s++; }
+
+    float val = 0.0f;
+    while(*s >= '0' && *s <= '9') {
+        val = val * 10.0f + (float)(*s - '0');
+        s++;
+    }
+    if(*s == '.') {
+        s++;
+        float frac = 0.1f;
+        while(*s >= '0' && *s <= '9') {
+            val += (float)(*s - '0') * frac;
+            frac *= 0.1f;
+            s++;
+        }
+    }
+    return sign * val;
+}
+
 // Parse une ligne JSONL null-terminée pour en extraire lat, lon et tag.
 static bool parse_jsonl_line(const char* line, float* out_lat, float* out_lon, char* out_tag, size_t tag_size) {
     if(!line) return false;
 
     const char* q = strstr(line, "\"lat\":");
     if(!q) return false;
-    *out_lat = (float)atof(q + 6);
+    *out_lat = simple_atof(q + 6);
 
     q = strstr(line, "\"lon\":");
     if(!q) return false;
-    *out_lon = (float)atof(q + 6);
+    *out_lon = simple_atof(q + 6);
 
     q = strstr(line, "\"tag\":\"");
     if(!q) return false;
