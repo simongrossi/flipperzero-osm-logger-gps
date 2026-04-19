@@ -14,13 +14,18 @@ extern const char* const TRACK_INTERVAL_LABELS[TRACK_INTERVAL_COUNT];
 extern const uint8_t TRACK_MIN_DISTS_M[TRACK_MIN_DIST_COUNT];
 extern const char* const TRACK_MIN_DIST_LABELS[TRACK_MIN_DIST_COUNT];
 
+#define DUPLICATE_CHECK_COUNT 4
+extern const uint8_t DUPLICATE_CHECK_M[DUPLICATE_CHECK_COUNT];
+extern const char* const DUPLICATE_CHECK_LABELS[DUPLICATE_CHECK_COUNT];
+
 typedef struct {
     uint32_t baud_rate;
     uint8_t track_interval_s;
     uint8_t track_min_dist_m;  // 0 = désactivé
-    bool track_hdop_strict;    // true : rejet des trkpts si HDOP > 2.5
-    bool preview_before_save;  // true : Quick Log demande confirmation avant save
-    bool auto_photo_id;        // true : append "photo:<total_count+1>" à la note au save
+    bool track_hdop_strict;
+    bool preview_before_save;
+    bool auto_photo_id;
+    uint8_t duplicate_check_m; // 0 = désactivé
 } Settings;
 
 void settings_defaults(Settings* s);
@@ -30,6 +35,7 @@ void settings_save(const Settings* s);
 uint8_t baud_rate_to_idx(uint32_t baud);
 uint8_t track_interval_to_idx(uint8_t seconds);
 uint8_t track_min_dist_to_idx(uint8_t meters);
+uint8_t duplicate_check_to_idx(uint8_t meters);
 
 #ifdef __cplusplus
 extern "C" {

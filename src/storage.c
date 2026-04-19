@@ -2,7 +2,9 @@
 #include <furi.h>
 #include <furi_hal_rtc.h>
 #include <storage/storage.h>
+#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -513,6 +515,126 @@ bool storage_get_point_raw(uint8_t idx_from_end, char* out, size_t out_size) {
     free(buf);
     out[0] = '\0';
     return false;
+}
+
+bool storage_pre_save_check(char* err, size_t err_size) {
+    if(err && err_size > 0) err[0] = '\0';
+
+    Storage* s = furi_record_open(RECORD_STORAGE);
+    bool ok = true;
+
+    FileInfo fi;
+    if(storage_common_stat(s, "/ext", &fi) != FSE_OK) {
+        if(err) snprintf(err, err_size, "SD card not found");
+        ok = false;
+        goto end;
+    }
+
+    if(storage_common_stat(s, "/ext/apps_data/osm_logger", &fi) != FSE_OK) {
+        FS_Error r = storage_common_mkdir(s, "/ext/apps_data/osm_logger");
+        if(r != FSE_OK && r != FSE_EXIST) {
+            if(err) snprintf(err, err_size, "Cannot create folder");
+            ok = false;
+            goto end;
+        }
+    }
+
+    uint64_t total = 0, freeb = 0;
+    if(storage_common_fs_info(s, "/ext", &total, &freeb) == FSE_OK) {
+        if(freeb < 10240u) {
+            if(err) snprintf(err, err_size, "Disk nearly full");
+            ok = false;
+            goto end;
+        }
+    }
+
+end:
+    furi_record_close(RECORD_STORAGE);
+    return ok;
+}
+
+static float haversine_m(float lat1, float lon1, float lat2, float lon2) {
+    const float DEG_TO_RAD = 0.01745329f;
+    const float M_PER_DEG_LAT = 110574.0f;
+    float avg_lat_rad = (lat1 + lat2) * 0.5f * DEG_TO_RAD;
+    float m_per_deg_lon = 111320.0f * cosf(avg_lat_rad);
+    float dlat = (lat2 - lat1) * M_PER_DEG_LAT;
+    float dlon = (lon2 - lon1) * m_per_deg_lon;
+    return sqrtf(dlat * dlat + dlon * dlon);
+}
+
+// Parse une ligne JSONL null-terminée pour en extraire lat, lon et tag.
+static bool parse_jsonl_line(const char* line, float* out_lat, float* out_lon, char* out_tag, size_t tag_size) {
+    if(!line) return false;
+
+    const char* q = strstr(line, "\"lat\":");
+    if(!q) return false;
+    *out_lat = (float)atof(q + 6);
+
+    q = strstr(line, "\"lon\":");
+    if(!q) return false;
+    *out_lon = (float)atof(q + 6);
+
+    q = strstr(line, "\"tag\":\"");
+    if(!q) return false;
+    const char* tag_start = q + 7;
+    size_t o = 0;
+    while(*tag_start && *tag_start != '"' && o < tag_size - 1) {
+        out_tag[o++] = *tag_start++;
+    }
+    out_tag[o] = '\0';
+    return true;
+}
+
+bool storage_find_duplicate_nearby(
+    float lat,
+    float lon,
+    const char* tag,
+    uint8_t max_dist_m,
+    float* out_dist_m) {
+    if(!tag || !*tag || max_dist_m == 0) return false;
+    Storage* s = furi_record_open(RECORD_STORAGE);
+    uint32_t size = 0;
+    char* buf = read_whole_file(s, "/ext/apps_data/osm_logger/points.jsonl", &size, 65536);
+    furi_record_close(RECORD_STORAGE);
+    if(!buf || size == 0) {
+        if(buf) free(buf);
+        return false;
+    }
+
+    bool found = false;
+    float nearest = (float)max_dist_m;
+
+    char* p = buf;
+    char* end = buf + size;
+    while(p < end) {
+        char* eol = memchr(p, '\n', (size_t)(end - p));
+        char saved = 0;
+        if(eol) {
+            saved = *eol;
+            *eol = '\0';
+        }
+
+        float llat = 0, llon = 0;
+        char ltag[64];
+        if(parse_jsonl_line(p, &llat, &llon, ltag, sizeof(ltag))) {
+            if(!strcmp(ltag, tag)) {
+                float d = haversine_m(lat, lon, llat, llon);
+                if(d < nearest) {
+                    nearest = d;
+                    found = true;
+                }
+            }
+        }
+
+        if(!eol) break;
+        *eol = saved;
+        p = eol + 1;
+    }
+
+    free(buf);
+    if(found && out_dist_m) *out_dist_m = nearest;
+    return found;
 }
 
 void storage_append_trkpt(float lat, float lon, float altitude, bool new_segment) {

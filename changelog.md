@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5 — 2026-04-19
+
+### Added
+- **Détection de doublons** : au save, si un point avec le même tag existe à moins de X mètres, afficher un écran de confirmation ("Same tag Ym away — OK=save anyway, Back=cancel"). Seuil configurable dans Settings : `Dup check` = off / 5m / 10m / 25m (défaut 10m).
+- **Écrans d'erreur explicites** : si le save échoue (SD absente, dossier impossible à créer, disque plein), un overlay rouge affiche `SAVE FAILED` + message précis. Une touche pour dismiss.
+- **Vérification pré-save** : avant chaque sauvegarde, check de la présence SD + espace libre (seuil 10 Ko). Évite les échecs silencieux.
+
+### Fixed
+- Le tag multi-ligne (`amenity=bench;material=wood`) était wrappé par `elements_multiline_text_aligned` par-dessus la ligne coords. Maintenant splitté proprement sur 2 lignes en Quick Log et Preview, les autres lignes décalées en conséquence.
+
+### Changed
+- `settings.txt` ajoute `duplicate_check_m` (entier en mètres, 0 = désactivé).
+
 ## 0.4 — 2026-04-19
 
 ### Added

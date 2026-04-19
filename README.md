@@ -14,7 +14,9 @@
 - Auto-notification (vibration + green LED) when GPS fix is acquired
 - **Battery badge** displayed on every live screen
 - **GPS Status** screen: fix, lat/lon, altitude, HDOP, satellites, fix age, live NMEA RX counters
-- **Settings menu** with persisted prefs on SD: baud rate, track interval, track min distance filter (off / 2 / 5 / 10 m), track HDOP strict toggle, preview-before-save toggle
+- **Settings menu** with persisted prefs on SD: baud rate, track interval, track min distance filter, track HDOP strict toggle, preview-before-save toggle, auto photo ID, duplicate detection threshold
+- **Duplicate detection**: when saving, if a point with the same tag exists within X meters, a confirmation screen appears ("Same tag Ym away — OK=save anyway, Back=cancel"). Threshold configurable (off / 5 / 10 / 25 m).
+- **Clear save-error screens** when the SD is absent / full / unwritable.
 - **Quick Log (waypoints)** mode:
   - Submenu of **23 OSM presets** by default, grouped by category (street furniture, roads, shops, emergency…)
   - **SD-loadable presets**: drop a `presets.txt` on the SD to replace the built-in list without recompiling

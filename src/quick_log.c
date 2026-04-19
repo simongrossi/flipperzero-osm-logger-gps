@@ -34,6 +34,9 @@ typedef struct {
     uint32_t fix_age_s;
     bool fix_ever;
     bool preview_pending;
+    bool duplicate_warning;
+    float duplicate_dist_m;
+    char last_error[64];
     char note[64];
 } QuickLogModel;
 
@@ -44,6 +47,45 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     if(!p) return;
 
     canvas_clear(canvas);
+
+    // Overlay erreur (SD absente/pleine) : prioritaire sur tout le reste
+    if(m->last_error[0]) {
+        canvas_set_font(canvas, FontPrimary);
+        elements_multiline_text_aligned(canvas, 64, 8, AlignCenter, AlignTop, "SAVE FAILED");
+        canvas_set_font(canvas, FontSecondary);
+        elements_multiline_text_aligned(
+            canvas, 64, 28, AlignCenter, AlignTop, m->last_error);
+        elements_multiline_text_aligned(
+            canvas, 64, 62, AlignCenter, AlignBottom, "Press any key");
+        return;
+    }
+
+    // Overlay doublon détecté
+    if(m->duplicate_warning) {
+        canvas_set_font(canvas, FontPrimary);
+        elements_multiline_text_aligned(canvas, 64, 2, AlignCenter, AlignTop, "Duplicate?");
+        canvas_set_font(canvas, FontSecondary);
+
+        char msg[64];
+        snprintf(
+            msg, sizeof(msg), "Same tag %.0fm away", (double)m->duplicate_dist_m);
+        elements_multiline_text_aligned(canvas, 64, 18, AlignCenter, AlignTop, msg);
+
+        char tag[64];
+        preset_build_tag(p, m->variant_idx, tag, sizeof(tag));
+        char* sc = strchr(tag, ';');
+        if(sc) {
+            *sc = '\0';
+            elements_multiline_text_aligned(canvas, 64, 30, AlignCenter, AlignTop, tag);
+            elements_multiline_text_aligned(canvas, 64, 38, AlignCenter, AlignTop, sc + 1);
+        } else {
+            elements_multiline_text_aligned(canvas, 64, 34, AlignCenter, AlignTop, tag);
+        }
+
+        elements_multiline_text_aligned(
+            canvas, 64, 62, AlignCenter, AlignBottom, "OK=save anyway  Back=cancel");
+        return;
+    }
 
     // Mode preview (confirmation) : écran distinct et pédagogique.
     if(m->preview_pending) {
@@ -182,8 +224,27 @@ static bool quick_log_do_save(App* app, bool force) {
         return false;
     }
 
+    // Pré-check SD (carte, dossier, espace)
+    if(!storage_pre_save_check(app->last_error, sizeof(app->last_error))) {
+        notification_message(app->notification, &sequence_error);
+        return false;
+    }
+
     char tag[64];
     preset_build_tag(p, app->current_variant, tag, sizeof(tag));
+
+    // Détection de doublon (si setting activé et pas déjà confirmé par user)
+    if(!force && app->settings.duplicate_check_m > 0) {
+        float dist = 0;
+        if(storage_find_duplicate_nearby(
+               app->lat, app->lon, tag,
+               app->settings.duplicate_check_m, &dist)) {
+            app->duplicate_warning = true;
+            app->duplicate_dist_m = dist;
+            notification_message(app->notification, &sequence_error);
+            return false;
+        }
+    }
 
     // Construit la note finale : note utilisateur, avec éventuellement "photo:N" append
     char final_note[128];
@@ -224,6 +285,31 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
     bool ok_short = (event->type == InputTypeShort && event->key == InputKeyOk);
     bool ok_long = (event->type == InputTypeLong && event->key == InputKeyOk);
     bool is_press = (event->type == InputTypeShort || event->type == InputTypeRepeat);
+
+    // Overlay erreur : n'importe quelle touche efface, on reste sur Quick Log
+    if(app->last_error[0]) {
+        if(event->type == InputTypeShort) {
+            app->last_error[0] = '\0';
+            quick_log_refresh(app);
+        }
+        return true;
+    }
+
+    // Overlay doublon : OK = save anyway (force), Back = annule
+    if(app->duplicate_warning) {
+        if(ok_short || ok_long) {
+            app->duplicate_warning = false;
+            quick_log_do_save(app, true); // force=true -> skip duplicate check
+            quick_log_refresh(app);
+            return true;
+        }
+        if(event->type == InputTypeShort && event->key == InputKeyBack) {
+            app->duplicate_warning = false;
+            quick_log_refresh(app);
+            return true;
+        }
+        return true;
+    }
 
     // Mode preview (confirmation) : gestion spéciale des touches
     if(app->preview_pending) {
@@ -345,6 +431,10 @@ void quick_log_refresh(App* app) {
             m->fix_age_s = age_s;
             m->fix_ever = fix_ever;
             m->preview_pending = app->preview_pending;
+            m->duplicate_warning = app->duplicate_warning;
+            m->duplicate_dist_m = app->duplicate_dist_m;
+            strncpy(m->last_error, app->last_error, sizeof(m->last_error) - 1);
+            m->last_error[sizeof(m->last_error) - 1] = '\0';
             strncpy(m->note, app->quick_note, sizeof(m->note) - 1);
             m->note[sizeof(m->note) - 1] = '\0';
         },

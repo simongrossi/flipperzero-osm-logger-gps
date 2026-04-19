@@ -35,3 +35,17 @@ uint8_t storage_read_last_points(char* out_lines, uint8_t max_lines, size_t line
 // Lit le N-ième point le plus récent (0 = dernier) en brut (ligne JSONL complète).
 // Retourne true si trouvé, false sinon.
 bool storage_get_point_raw(uint8_t idx_from_end, char* out, size_t out_size);
+
+// Vérifie que la SD est prête pour une écriture (carte présente, dossier OK,
+// espace suffisant). Retourne true si OK. Sinon remplit `err` avec un message
+// court et retourne false.
+bool storage_pre_save_check(char* err, size_t err_size);
+
+// Cherche dans points.jsonl un point avec le même tag à moins de max_dist_m
+// mètres. Retourne true si trouvé et remplit out_dist_m (distance au plus proche).
+bool storage_find_duplicate_nearby(
+    float lat,
+    float lon,
+    const char* tag,
+    uint8_t max_dist_m,
+    float* out_dist_m);

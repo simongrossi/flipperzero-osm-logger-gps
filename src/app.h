@@ -93,8 +93,11 @@ typedef struct App {
     // --- Point detail ---
     View* point_detail_view;
 
-    // --- Preview save (flag temporaire) ---
-    bool preview_pending;
+    // --- Preview / guard flags (temporaires, overlay Quick Log) ---
+    bool preview_pending;     // setting preview_before_save déclenché
+    bool duplicate_warning;   // détecté un point proche avec le même tag
+    float duplicate_dist_m;   // distance au point le plus proche
+    char last_error[64];      // message d'erreur à afficher en overlay (ex. "Disk full")
 } App;
 
 void app_reconfigure_uart(App* app);

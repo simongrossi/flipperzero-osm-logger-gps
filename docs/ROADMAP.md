@@ -36,11 +36,6 @@ Fait passer l'app de "fonctionnel" à "abouti" visuellement.
 
 ## 🧩 Qualité des données
 
-### Détection de doublons
-Si le point à sauver est à < 10 m (configurable) d'un point existant avec le même tag → son différent + dialog "Duplicate? OK=save anyway, Back=cancel". Évite les doublons lors de passages répétés au même endroit.
-
-Implémentation : lire les derniers points de `points.jsonl` au save, calculer haversine (déjà dispo dans `track.c`).
-
 ### Altitude calibration point-zéro
 Option "Calibrate altitude here" dans Settings : fige l'altitude actuelle comme offset négatif à ajouter aux prochaines mesures. Corrige les dérives GPS typiques (± 20 m).
 
@@ -54,14 +49,8 @@ Workflow `.github/workflows/build.yml` qui build avec ufbt à chaque push sur ma
 ### Tests unitaires du parser NMEA
 Des samples NMEA réels en fichier texte → attendu parsé (lat, lon, sats, etc.). Run dans la CI. Empêche les régressions sur le code le plus critique.
 
-### Écrans d'erreur propres
-Détecter : SD absente, SD pleine, `mkdir` échoué → écran rouge explicite au lieu d'échec silencieux.
-
 ### Crash recovery log
 Si `app_show_fatal` est appelé, dumper la backtrace dans `/ext/apps_data/osm_logger/crash.log`. Debugging grandement facilité pour les retours utilisateurs.
-
-### Vérification de l'espace disque
-Avant chaque save, `storage_common_fs_info(s, "/ext", &total, &free)` → refuser si free < seuil. Aujourd'hui un save sur SD pleine échoue silencieusement.
 
 ### Rotation des fichiers
 Après N points (ex. 1000), ouvrir un fichier nouveau (`points-2.jsonl`, `track-2.gpx`) pour éviter les fichiers géants et faciliter les imports partiels.
