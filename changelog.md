@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.8 — 2026-04-19
+
+### Added
+- **Catalogue OSM étoffé** : de 23 presets en v0.7 à **65 presets** en 15 catégories (v0.8).
+  - **Street furniture** : +6 (Telephone, Shelter, Vending machine, Public bookcase, Clock, Bollard, Water tap)
+  - **Roads & signs** : +4 (Traffic signals, Stop, Give way, Speed bump, Mile marker)
+  - **Parking** : +1 (Disabled parking avec tag additionnel wheelchair=designated)
+  - **Sports & leisure** : +7 (Football, Tennis, Ping pong, Skate park, Fitness station, Swimming pool, Climbing wall)
+  - **Waste** : +1 (Composter) + variantes de recycling (glass/paper/clothes/plastic)
+  - **Shops** (nouvelle catégorie dédiée) : Supermarket, Clothes, Hairdresser, Beauty, Bookshop, Hardware, Florist (+ Cafe/Restaurant/Pharmacy/Bakery préservés)
+  - **Services** (nouvelle catégorie) : Bank, ATM, Post office, Doctor, Dentist, Veterinary, Gas station, Car wash, Laundry
+  - **Emergency** : +4 (Fire station, Police, Hospital, Emergency phone)
+  - **Tourism** (nouvelle catégorie) : Hotel, Museum, Viewpoint, Artwork, Monument, Camp site, Attraction
+  - **Nature** (nouvelle catégorie) : Tree, Bush, Peak, Spring, Park
+  - **Education** (nouvelle catégorie) : School, Kindergarten, University, Library
+  - **Religion** (nouvelle catégorie) : Place of worship, Chapel, Cemetery, Wayside cross
+  - **Transport** (nouvelle catégorie) : Bus stop, Tram stop, Subway entrance, Train station, Taxi stand, Bike rental, Ferry
+  - **Address** (nouvelle catégorie) : House number, Building entry, Building — convention "note field = house number" documentée dans le tutoriel OSM
+- **`PRESETS_MAX_ENTRIES`** bumped de 64 à 128 pour accommoder les extensions via `presets.txt`.
+
+### Changed
+- Categories enum passe de 8 à 15 valeurs.
+- `presets.txt.sample` réécrit avec la table de catégories et des exemples par usage.
+- `docs/GETTING_STARTED_OSM.md` : ajout du workflow "House number" (utiliser la note pour saisir le numéro, éditer le tag dans JOSM).
+
+## 0.7 — 2026-04-19
+
+### Added
+- **Icônes dans le menu principal** : refactor `Submenu` → `Menu` Flipper module, 6 icônes 10×10 1-bit (Quick Log, Track, Last points, GPS status, Settings, About) générées dans `images/` et packagées via `fap_icon_assets`.
+- **Sous-catégories de presets** : nouvelle vue intermédiaire entre le menu principal et la liste des presets. Les 23 presets par défaut sont regroupés en 7 catégories (Street furniture, Roads, Parking, Sports & leisure, Waste, Shops & services, Emergency). Les `presets.txt` peuvent inclure un champ catégorie optionnel `label;key;value[,variants];category` (0..7).
+- **Archive session** : nouvelle action dans Last points → "Archive session" → renomme les 5 fichiers de sortie dans un sous-dossier `session_YYYYMMDDTHHMMSS/`. Plus simple qu'un ZIP compressé (pas de zlib dispo sur Flipper), même valeur UX : un dossier unique à transférer via qFlipper.
+
+### Changed
+- Flow de sélection : Main menu → Categories → Presets (filtrés par catégorie) → Quick Log. Back navigation cohérente à chaque niveau.
+
 ## 0.6 — 2026-04-19
 
 ### Added

@@ -27,6 +27,11 @@ bool storage_delete_last_point(void);
 // points.geojson). track.gpx n'est pas touché (mode séparé).
 void storage_clear_all_points(void);
 
+// Archive la session courante : crée /ext/apps_data/osm_logger/session_<ts>/
+// et y déplace les 5 fichiers de sortie. Retourne true si au moins un fichier
+// a été déplacé. Fills err si une erreur bloquante survient.
+bool storage_archive_session(char* err, size_t err_size);
+
 // Lit les N dernières lignes de points.jsonl, extrait les champs "time" et "tag"
 // pour chacune, et les écrit sous la forme "HH:MM  tag" dans out_lines (buffer
 // d'au moins N * line_size octets). Retourne le nombre de lignes lues (0..N).

@@ -517,6 +517,51 @@ bool storage_get_point_raw(uint8_t idx_from_end, char* out, size_t out_size) {
     return false;
 }
 
+bool storage_archive_session(char* err, size_t err_size) {
+    if(err && err_size > 0) err[0] = '\0';
+
+    Storage* s = furi_record_open(RECORD_STORAGE);
+
+    // Timestamp pour le nom de dossier
+    DateTime dt;
+    furi_hal_rtc_get_datetime(&dt);
+    char folder[96];
+    snprintf(
+        folder,
+        sizeof(folder),
+        "/ext/apps_data/osm_logger/session_%04u%02u%02uT%02u%02u%02u",
+        dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+
+    FS_Error r = storage_common_mkdir(s, folder);
+    if(r != FSE_OK && r != FSE_EXIST) {
+        if(err) snprintf(err, err_size, "mkdir failed");
+        furi_record_close(RECORD_STORAGE);
+        return false;
+    }
+
+    // Renomme les fichiers (silencieux si absent)
+    static const char* const files[] = {
+        "points.jsonl", "notes.csv", "points.gpx", "points.geojson", "track.gpx",
+    };
+    bool any = false;
+    for(size_t i = 0; i < sizeof(files) / sizeof(files[0]); i++) {
+        char src[96], dst[128];
+        snprintf(src, sizeof(src), "/ext/apps_data/osm_logger/%s", files[i]);
+        snprintf(dst, sizeof(dst), "%s/%s", folder, files[i]);
+        FileInfo fi;
+        if(storage_common_stat(s, src, &fi) == FSE_OK) {
+            if(storage_common_rename(s, src, dst) == FSE_OK) {
+                any = true;
+            }
+        }
+    }
+
+    if(!any && err) snprintf(err, err_size, "no files to archive");
+
+    furi_record_close(RECORD_STORAGE);
+    return any;
+}
+
 bool storage_pre_save_check(char* err, size_t err_size) {
     if(err && err_size > 0) err[0] = '\0';
 

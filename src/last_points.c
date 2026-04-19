@@ -22,6 +22,7 @@
 // Chaque action a un ID distinct en dehors de la plage [0..MAX_DISPLAY-1]
 #define ACTION_DELETE_LAST 100
 #define ACTION_CLEAR_ALL   101
+#define ACTION_ARCHIVE     102
 
 static char g_lines[MAX_DISPLAY][LINE_BUF_SIZE];
 
@@ -41,6 +42,16 @@ static void last_points_item_callback(void* ctx, uint32_t index) {
         app->total_count = 0;
         app->session_count = 0;
         notification_message(app->notification, &sequence_success);
+        app_start_last_points(app);
+    } else if(index == ACTION_ARCHIVE) {
+        char err[48];
+        if(storage_archive_session(err, sizeof(err))) {
+            app->total_count = 0;
+            app->session_count = 0;
+            notification_message(app->notification, &sequence_success);
+        } else {
+            notification_message(app->notification, &sequence_error);
+        }
         app_start_last_points(app);
     } else if(index < MAX_DISPLAY) {
         // Clic sur un point individuel -> détails
@@ -80,7 +91,13 @@ static void build_list(App* app) {
         app);
     submenu_add_item(
         app->last_points_menu,
-        "--- Clear all (new session) ---",
+        "--- Archive session ---",
+        ACTION_ARCHIVE,
+        last_points_item_callback,
+        app);
+    submenu_add_item(
+        app->last_points_menu,
+        "--- Clear all ---",
         ACTION_CLEAR_ALL,
         last_points_item_callback,
         app);

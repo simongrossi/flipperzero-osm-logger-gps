@@ -2,27 +2,14 @@
 
 Ce fichier liste tout ce qui reste à faire dans l'app, groupé par thème et priorité.
 
-**Pour un état "v1.0 catalogue-ready polished"**, la suite recommandée est (dans l'ordre) :
-1. Icônes dans le menu principal (refactor Submenu → Menu module Flipper)
-2. Sous-catégories dans le sous-menu presets (2 niveaux)
-3. Export ZIP depuis l'app (ou tar, ou simple concat)
-4. Tests unitaires parser NMEA
-5. Note link to photo convention (déjà couvert par `auto_photo_id`, documenter OSM-side)
+**Pour un état "v1.0 catalogue-ready polished"**, la suite recommandée est :
+1. Tests unitaires parser NMEA (invoqué dans la CI)
+2. Détection de doublons plus fine (seuil dynamique selon HDOP ?)
+3. OSM Notes API via WiFi dev board (le gros morceau ambitieux, v1.0+)
 
 ---
 
 ## 🎯 Haute priorité — UX terrain
-
-### Icônes dans le menu principal
-Le `Submenu` Flipper accepte un icône 10×10 par item via `submenu_add_item_ex` ou en définissant des ressources. 6 icônes à dessiner :
-- Pin pour Quick Log
-- Ligne qui serpente pour Track mode
-- Liste pour Last points
-- Satellite pour GPS status
-- Engrenage pour Settings
-- `i` pour About
-
-Fait passer l'app de "fonctionnel" à "abouti" visuellement.
 
 ---
 

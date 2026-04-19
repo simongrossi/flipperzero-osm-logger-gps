@@ -20,10 +20,13 @@
 #include "point_detail.h"
 #include "presets.h"
 #include "storage_helpers.h"
+#include <osm_logger_icons.h>
 
 // --- Forward
 static void app_menu_callback(void* ctx, uint32_t index);
+static void category_menu_callback(void* ctx, uint32_t index);
 static void preset_menu_callback(void* ctx, uint32_t index);
+static void rebuild_preset_menu(App* app);
 static void serial_rx_callback(
     FuriHalSerialHandle* handle, FuriHalSerialRxEvent event, void* context);
 
@@ -56,8 +59,14 @@ void app_reconfigure_uart(App* app) {
     app->nmea_pos = 0;
 }
 
-// Back depuis le sous-menu des presets -> retour au menu principal
+// Back depuis le sous-menu des presets -> retour à la liste des catégories
 static uint32_t preset_menu_previous(void* ctx) {
+    (void)ctx;
+    return AppViewCategories;
+}
+
+// Back depuis le sous-menu des catégories -> retour au menu principal
+static uint32_t category_menu_previous(void* ctx) {
     (void)ctx;
     return AppViewMenu;
 }
@@ -143,7 +152,7 @@ static void serial_rx_callback(FuriHalSerialHandle* handle, FuriHalSerialRxEvent
 static void app_menu_callback(void* ctx, uint32_t index) {
     App* app = ctx;
     if(index == MenuItemQuickLog) {
-        view_dispatcher_switch_to_view(app->dispatcher, AppViewPresets);
+        view_dispatcher_switch_to_view(app->dispatcher, AppViewCategories);
     } else if(index == MenuItemTrack) {
         app_start_track(app);
     } else if(index == MenuItemLastPoints) {
@@ -157,12 +166,35 @@ static void app_menu_callback(void* ctx, uint32_t index) {
     }
 }
 
+// --- Sous-menu catégories : choix -> remplit preset_menu et bascule dessus
+static void category_menu_callback(void* ctx, uint32_t index) {
+    App* app = ctx;
+    if(index >= PresetCatCount) return;
+    app->current_category = (uint8_t)index;
+    rebuild_preset_menu(app);
+    view_dispatcher_switch_to_view(app->dispatcher, AppViewPresets);
+}
+
+// Rebuild du submenu preset en filtrant sur la catégorie courante
+static void rebuild_preset_menu(App* app) {
+    submenu_reset(app->preset_menu);
+    submenu_set_header(app->preset_menu, PRESET_CATEGORY_LABELS[app->current_category]);
+    uint8_t n = presets_count_in_category(app->current_category);
+    for(uint8_t i = 0; i < n; i++) {
+        uint8_t global_idx = presets_get_index_in_category(app->current_category, i);
+        if(global_idx == 0xFF) continue;
+        const Preset* p = presets_get(global_idx);
+        if(!p) continue;
+        submenu_add_item(app->preset_menu, p->label, global_idx, preset_menu_callback, app);
+    }
+}
+
 // --- Sous-menu presets : choix -> ouvre Quick Log avec ce preset
 static void preset_menu_callback(void* ctx, uint32_t index) {
     App* app = ctx;
     if(index < presets_count()) {
         app->current_preset = (uint8_t)index;
-        app->current_variant = 0; // reset de la variante à chaque nouveau choix
+        app->current_variant = 0;
     }
     app_start_quick_log(app);
 }
@@ -207,30 +239,43 @@ int32_t app(void* p) {
     // Total cumulatif de points (compte les lignes de points.jsonl existant)
     app->total_count = storage_count_saved_points();
 
-    // Menu principal
-    app->menu = submenu_alloc();
-    submenu_add_item(
-        app->menu, "Quick Log (waypoints)", MenuItemQuickLog, app_menu_callback, app);
-    submenu_add_item(
-        app->menu, "Track mode (auto GPX)", MenuItemTrack, app_menu_callback, app);
-    submenu_add_item(
-        app->menu, "Last points (browse/undo)", MenuItemLastPoints, app_menu_callback, app);
-    submenu_add_item(
-        app->menu, "GPS status", MenuItemStatus, app_menu_callback, app);
-    submenu_add_item(
-        app->menu, "Settings", MenuItemSettings, app_menu_callback, app);
-    submenu_add_item(
-        app->menu, "About", MenuItemAbout, app_menu_callback, app);
-    View* menu_view = submenu_get_view(app->menu);
+    // Menu principal (Menu module Flipper avec icônes)
+    app->menu = menu_alloc();
+    menu_add_item(
+        app->menu, "Quick Log", &I_icon_quicklog_10x10,
+        MenuItemQuickLog, app_menu_callback, app);
+    menu_add_item(
+        app->menu, "Track mode", &I_icon_track_10x10,
+        MenuItemTrack, app_menu_callback, app);
+    menu_add_item(
+        app->menu, "Last points", &I_icon_lastpoints_10x10,
+        MenuItemLastPoints, app_menu_callback, app);
+    menu_add_item(
+        app->menu, "GPS status", &I_icon_status_10x10,
+        MenuItemStatus, app_menu_callback, app);
+    menu_add_item(
+        app->menu, "Settings", &I_icon_settings_10x10,
+        MenuItemSettings, app_menu_callback, app);
+    menu_add_item(
+        app->menu, "About", &I_icon_about_10x10,
+        MenuItemAbout, app_menu_callback, app);
+    View* menu_view = menu_get_view(app->menu);
     view_dispatcher_add_view(app->dispatcher, AppViewMenu, menu_view);
 
-    // Sous-menu des presets OSM
-    app->preset_menu = submenu_alloc();
-    submenu_set_header(app->preset_menu, "Pick a POI type");
-    for(uint8_t i = 0; i < presets_count(); i++) {
+    // Sous-menu des catégories (premier niveau de navigation presets)
+    app->category_menu = submenu_alloc();
+    submenu_set_header(app->category_menu, "Category");
+    for(uint8_t i = 0; i < PresetCatCount; i++) {
+        if(presets_count_in_category(i) == 0) continue; // cache les catégories vides
         submenu_add_item(
-            app->preset_menu, presets_get(i)->label, i, preset_menu_callback, app);
+            app->category_menu, PRESET_CATEGORY_LABELS[i], i, category_menu_callback, app);
     }
+    View* category_view = submenu_get_view(app->category_menu);
+    view_set_previous_callback(category_view, category_menu_previous);
+    view_dispatcher_add_view(app->dispatcher, AppViewCategories, category_view);
+
+    // Sous-menu des presets (second niveau, rempli dynamiquement)
+    app->preset_menu = submenu_alloc();
     View* preset_view = submenu_get_view(app->preset_menu);
     view_set_previous_callback(preset_view, preset_menu_previous);
     view_dispatcher_add_view(app->dispatcher, AppViewPresets, preset_view);
@@ -298,8 +343,11 @@ int32_t app(void* p) {
     view_dispatcher_remove_view(app->dispatcher, AppViewPresets);
     submenu_free(app->preset_menu);
 
+    view_dispatcher_remove_view(app->dispatcher, AppViewCategories);
+    submenu_free(app->category_menu);
+
     view_dispatcher_remove_view(app->dispatcher, AppViewMenu);
-    submenu_free(app->menu);
+    menu_free(app->menu);
 
     view_dispatcher_free(app->dispatcher);
 

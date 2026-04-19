@@ -96,7 +96,21 @@ Quelques repères sur l'écran GPS Status :
 
 ---
 
-## 📸 Étape 5 — Workflow avec photos (optionnel)
+## 🏠 Étape 5 — Logger des numéros de rue
+
+L'app inclut un preset spécial **House number** (catégorie Address). Il sauve un tag placeholder `addr:housenumber=TBD`. Workflow :
+
+1. Stationne-toi devant la maison **#23** rue Victor Hugo
+2. Quick Log → catégorie **Address** → **House number**
+3. Appuie `Up` pour ouvrir l'éditeur de note, tape **`23`**, OK
+4. Retour Quick Log → OK pour sauvegarder → tu as un point avec `addr:housenumber=TBD` et `note=23`
+5. Au post-traitement (JOSM), remplace `TBD` par `23` sur chaque point, supprime la note
+
+Encore mieux : dans **JOSM**, utilise le plugin `utilsplugin2` qui permet de générer les numéros en masse à partir d'un champ.
+
+Preset **Building** et **Building entry** sont aussi dispos pour enrichir les adresses.
+
+## 📸 Étape 6 — Workflow avec photos (optionnel)
 
 Si tu prends aussi des photos pour documenter, active la feature **Auto photo ID** dans Settings. À chaque save, l'app ajoute automatiquement `photo:<N>` dans la note (N incrémenté). Tu fais tes photos **dans le même ordre**, et à l'import tu sais quelle photo correspond à quel point.
 
@@ -109,7 +123,7 @@ Tes photos gardent leurs noms `IMG_1234.jpg` mais tu peux les aligner sur les nu
 
 ---
 
-## 💾 Étape 6 — Récupérer les données
+## 💾 Étape 7 — Récupérer les données
 
 À la fin de la balade :
 
@@ -127,7 +141,7 @@ Tes photos gardent leurs noms `IMG_1234.jpg` mais tu peux les aligner sur les nu
 
 ---
 
-## ✏️ Étape 7 — Importer dans JOSM
+## ✏️ Étape 8 — Importer dans JOSM
 
 [JOSM](https://josm.openstreetmap.de/) est l'éditeur OSM de référence, gratuit, puissant.
 

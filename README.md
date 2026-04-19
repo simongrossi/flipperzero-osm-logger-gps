@@ -17,8 +17,10 @@
 - **Settings menu** with persisted prefs on SD: baud rate, track interval, track min distance filter, track HDOP strict toggle, preview-before-save toggle, auto photo ID, duplicate detection threshold
 - **Duplicate detection**: when saving, if a point with the same tag exists within X meters, a confirmation screen appears ("Same tag Ym away — OK=save anyway, Back=cancel"). Threshold configurable (off / 5 / 10 / 25 m).
 - **Clear save-error screens** when the SD is absent / full / unwritable.
+- **Main menu with icons** (Menu module, one dedicated icon per entry)
 - **Quick Log (waypoints)** mode:
-  - Submenu of **23 OSM presets** by default, grouped by category (street furniture, roads, shops, emergency…)
+  - Navigation in **two levels**: pick a category → pick a preset inside
+  - **65 OSM presets** by default grouped in 15 categories (Street furniture, Roads & signs, Parking, Sports & leisure, Waste, Shops, Services, Emergency, Tourism, Nature, Education, Religion, Transport, Address, Other)
   - **SD-loadable presets**: drop a `presets.txt` on the SD to replace the built-in list without recompiling
   - **Preset variants** cyclable with `←` / `→` — alternative values *or* additional secondary tags (e.g. `Bench` → `amenity=bench` → `amenity=bench;material=wood`)
   - **Short note editor** via `Up` (Flipper TextInput), `Down` to clear
@@ -32,7 +34,7 @@
   - **Live stats on screen**: session duration, points count, cumulative distance, instant speed, max speed
   - Each session starts a new `<trkseg>` (no bogus line between separate sessions)
   - Ideal for mapping a street or path on foot or bike
-- **Last points browser** (main menu entry): scrollable list of the 10 most recent saves. Tap any point to see full details (time, coords, altitude, HDOP, sats, tag, note). Actions: **Delete last** (undo across all 4 output files) and **Clear all** (new session).
+- **Last points browser** (main menu entry): scrollable list of the 10 most recent saves. Tap any point to see full details (time, coords, altitude, HDOP, sats, tag, note). Actions: **Delete last** (undo across all 4 output files), **Archive session** (moves the 5 output files to a dated subfolder, ready to transfer as a unit via qFlipper) and **Clear all**.
 - Saves to `/ext/apps_data/osm_logger/` in **5 native formats** (all valid at all times):
   - `points.jsonl` — one JSON line per point
   - `notes.csv` — spreadsheet-friendly

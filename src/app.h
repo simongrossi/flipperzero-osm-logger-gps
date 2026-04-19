@@ -1,5 +1,6 @@
 #pragma once
 #include <furi.h>
+#include <gui/modules/menu.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_input.h>
 #include <gui/modules/variable_item_list.h>
@@ -20,8 +21,10 @@ typedef struct App {
     // UI
     Gui* gui;
     ViewDispatcher* dispatcher;
-    Submenu* menu;           // menu principal
-    Submenu* preset_menu;    // liste des presets OSM
+    Menu* menu;              // menu principal (avec icônes)
+    Submenu* category_menu;  // liste des catégories (premier niveau)
+    Submenu* preset_menu;    // liste des presets OSM filtrés par catégorie
+    uint8_t current_category; // catégorie courante
     Submenu* last_points_menu; // vue "Last points" (browse + undo)
     TextInput* note_input;   // éditeur de note courte
     NotificationApp* notification;
@@ -108,7 +111,7 @@ void app_reconfigure_uart(App* app);
 
 typedef enum {
     AppViewMenu = 0,
-    AppViewPresets = 1,
+    AppViewPresets = 1,       // liste filtrée par catégorie
     AppViewQuickLog = 2,
     AppViewTrack = 3,
     AppViewStatus = 4,
@@ -117,5 +120,6 @@ typedef enum {
     AppViewSettings = 7,
     AppViewLastPoints = 8,
     AppViewPointDetail = 9,
+    AppViewCategories = 10,   // nouveau : liste des catégories
 } AppView;
 

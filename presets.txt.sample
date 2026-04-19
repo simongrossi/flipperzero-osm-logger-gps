@@ -1,27 +1,46 @@
-# Format : un preset par ligne : label;key;value[,variant1,variant2,...]
+# Format : label;key;value[,variant1,variant2,...][;category]
 # - Lignes vides et lignes commençant par # ignorées.
-# - Séparateur strict : ';' entre les 3 champs (sans espace)
-# - Plusieurs valeurs séparées par ',' = variantes, cyclables avec </> dans Quick Log
-# - Label <= 18 caractères, pas d'accents.
-# - Copier ce fichier sur la microSD sous /ext/apps_data/osm_logger/presets.txt
-#   pour remplacer la liste par défaut compilée dans l'app.
+# - Séparateur strict : ';' entre les 3 (ou 4) champs, sans espace.
+# - Plusieurs valeurs séparées par ',' = variantes, cyclables avec </> dans Quick Log.
+# - Variante contenant '=' -> tag additionnel au primaire (ex. material=wood).
+# - Catégorie optionnelle (4e champ) : 0..14. Si omise -> 14 (Other).
 #
-# Max 8 variantes par preset, max 64 presets au total, fichier <= 4 Ko.
+# Catégories :
+#   0 = Street furniture    8 = Tourism
+#   1 = Roads & signs       9 = Nature
+#   2 = Parking            10 = Education
+#   3 = Sports & leisure   11 = Religion
+#   4 = Waste              12 = Transport
+#   5 = Shops              13 = Address
+#   6 = Services           14 = Other
+#   7 = Emergency
+#
+# Copier ce fichier sur la microSD sous /ext/apps_data/osm_logger/presets.txt
+# pour remplacer la liste par défaut compilée dans l'app.
+# Limites : 128 presets max, 8 variantes par preset, fichier <= 4 Ko.
 # Pour trouver les bonnes clés/valeurs OSM : https://taginfo.openstreetmap.org/
 
-Banc;amenity;bench
-Poubelle;amenity;waste_basket
-# Exemple avec variantes : </> cyclera entre drinking_water et fountain
-Fontaine;amenity;drinking_water,fountain
-Toilettes;amenity;toilets
-Parking velo;amenity;bicycle_parking
-Parking auto;amenity;parking,motorcycle_parking
-Recyclage;amenity;recycling
-Defibrillateur;emergency;defibrillator
-Boite aux lettres;amenity;post_box
-Aire de jeux;leisure;playground
-Borne de charge;amenity;charging_station
-Lampadaire;highway;street_lamp
-Arret de bus;highway;bus_stop
-Panier de basket;amenity;basketball_hoop
-Cafe;amenity;cafe,pub,bar,fast_food
+# Exemples
+Banc;amenity;bench;0
+Poubelle;amenity;waste_basket;0
+# Fontaine avec variantes "fountain" et tag additionnel "bottle=yes"
+Fontaine;amenity;drinking_water,fountain,bottle=yes;0
+Toilettes;amenity;toilets;0
+
+# Roads
+Passage pieton;highway;crossing;1
+
+# Shops
+Pharmacie;amenity;pharmacy;5
+Boulangerie;shop;bakery;5
+Cafe;amenity;cafe,pub,bar,fast_food;5
+
+# Services
+Banque;amenity;bank;6
+Distributeur;amenity;atm;6
+
+# Tourism
+Hotel;tourism;hotel,hostel;8
+
+# Address (le numéro se saisit dans la note sur le Flipper)
+Numero de rue;addr:housenumber;TBD;13

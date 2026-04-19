@@ -35,6 +35,9 @@ application.fam      # manifest ufbt
 | 7  | `AppViewSettings` | VariableItemList | `AppViewMenu` (previous_callback) |
 | 8  | `AppViewLastPoints` | Submenu (dynamic)| `AppViewMenu` (previous_callback) |
 | 9  | `AppViewPointDetail` | View (static) | `AppViewLastPoints` (previous_callback) |
+| 10 | `AppViewCategories` | Submenu       | `AppViewMenu` (previous_callback) |
+
+Le menu principal `AppViewMenu` a été refactoré de `Submenu` vers **`Menu`** (module Flipper qui supporte un icône 10×10 par item). Les icônes sont dans `images/` et packagées via `fap_icon_assets="images"`, exposées en code sous `I_<filename>_10x10`.
 
 ### Vue Quick Log : view model + tick refresh
 
