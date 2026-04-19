@@ -8,7 +8,7 @@ App(
     requires=["gui", "storage", "notification"],
     stack_size=4096,
     fap_category="GPIO",
-    fap_version=(0, 14),
+    fap_version=(0, 15),
     fap_icon="osm_logger.png",
     fap_icon_assets="images",
     fap_author="Simon Grossi",

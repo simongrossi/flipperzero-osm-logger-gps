@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.15 — 2026-04-19
+
+Data quality release — élimine 4 sources d'incohérence dans les fichiers de sortie révélés par une session de test.
+
+### Fixed
+- **Refuse les saves à lat=0, lon=0** — avant, un force save (OK long) indoor avec GPS pas encore initialisé écrivait un point à (0,0) dans les 6 fichiers de sortie. Polluait `points.jsonl`/`points.gpx`/etc. et cassait les imports QGIS (point au large de la côte d'Afrique). Maintenant : save refusé avec message `GPS not initialized (0,0)`, même en force. La seule façon de sauver est d'avoir au moins une trame GPS qui a reporté des coords non-nulles.
+- **Icône OsmAnd "TBD"** — pour les presets avec valeur placeholder (`House number` → `addr:housenumber=TBD`), l'hint icon OsmAnd était `TBD` → OsmAnd affichait une icône générique cassée. Maintenant : liste de placeholders reconnus (`TBD`, `?`, `tbd`, `fill_me`) → fallback sur `special_marker` (icône neutre).
+- **Couleur Address = `#ffffff` invisible** — les favoris blancs disparaissaient sur fond carte clair dans OsmAnd. Remplacé par `#a020f0` (violet), distinct des 14 autres catégories.
+- **Workflow House number cassé** — le tag restait `addr:housenumber=TBD` même avec une note contenant le numéro → 0 valeur pour OSM. Nouveau comportement "note-as-value" : quand la valeur primaire d'un preset est un placeholder (`TBD`, `?`, `tbd`, `fill_me`) ET que la note user est "safe" (pas de `=` ni `;`), la note remplace le placeholder au save. Ex. preset "House number" + note "42" → tag final `addr:housenumber=42`. La note est alors retirée du champ `note` pour éviter la duplication. `auto_photo_id` reste appliqué normalement (`photo:N` seul dans la note).
+
+### Note pour les utilisateurs existants
+Les fichiers historiques ne sont **pas rétro-corrigés** : les vieux points à (0,0) restent dans `points.jsonl`/`points.gpx`/etc. Pour repartir propre : **Last points → Clear all** ou **Archive session** avant ta prochaine vraie sortie.
+
+### Convention étendue pour les presets custom
+Dans ton `presets.txt`, tu peux maintenant utiliser `TBD` comme valeur placeholder pour les presets où le numéro/identifiant est saisi à la volée :
+```
+Room number;addr:flats;TBD;13
+```
+L'user tape "23" en note → tag final `addr:flats=23`.
+
 ## 0.14 — 2026-04-19
 
 ### Added

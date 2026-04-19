@@ -44,7 +44,7 @@ const char* const PRESET_CATEGORY_COLORS[PresetCatCount] = {
     "#6040a0", // Education — indigo
     "#a08040", // Religion — brown
     "#4040c0", // Transport — navy
-    "#ffffff", // Address — white
+    "#a020f0", // Address — purple (visible sur fond carte clair)
     "#c0c0c0", // Other — silver
 };
 
@@ -166,8 +166,9 @@ static const Preset DEFAULT_PRESETS[] = {
     {"Ferry", "amenity", {"ferry_terminal"}, 1, PresetCatTransport},
 
     // =========================  Address  =====================================
-    // Convention : utiliser la note pour saisir le numéro. Le tag est
-    // un placeholder OSM que le contributeur édite dans JOSM (ex. addr:housenumber=23).
+    // Convention "note-as-value" (v0.15+) : valeur "TBD" = placeholder, la note
+    // saisie via Up remplace automatiquement le TBD au save.
+    // Ex. preset "House number" + note "42" → tag final addr:housenumber=42.
     {"House number", "addr:housenumber", {"TBD"}, 1, PresetCatAddress},
     {"Building entry", "entrance", {"main", "yes", "service", "emergency"}, 4, PresetCatAddress},
     {"Building", "building", {"yes", "residential", "commercial", "industrial"}, 4, PresetCatAddress},

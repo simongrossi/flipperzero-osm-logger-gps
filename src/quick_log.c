@@ -288,10 +288,37 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
 
 // Fonction de save bas niveau : écrit un point avec les coords et HDOP fournis.
 // Utilisée à la fois pour les saves instantanés et pour le final d'un averaging.
+// Valeurs "placeholder" : on ne peut pas les utiliser ni comme icône OsmAnd,
+// ni comme vraie valeur de tag OSM. Doivent être remplacées par la note utilisateur.
+static bool is_placeholder_value(const char* v) {
+    if(!v || !v[0]) return true;
+    return strcmp(v, "TBD") == 0 || strcmp(v, "?") == 0 ||
+           strcmp(v, "tbd") == 0 || strcmp(v, "fill_me") == 0;
+}
+
+// Retourne true si la note est "safe" comme valeur de tag OSM : pas de '=' ni ';'
+// qui casseraient notre format interne, non vide après trim.
+static bool note_is_safe_as_value(const char* note) {
+    if(!note || !note[0]) return false;
+    for(const char* p = note; *p; p++) {
+        if(*p == '=' || *p == ';') return false;
+    }
+    return true;
+}
+
 static bool quick_log_write_point(
     App* app, float lat, float lon, float hdop, uint8_t sats, float altitude,
     const Preset* p, bool forced_note_avg) {
     if(!p) return false;
+
+    // Refuser les saves à lat=0/lon=0 (GPS non initialisé, trame RMC/GGA sans coords).
+    // Ces points polluent les fichiers de sortie et n'ont aucune valeur OSM.
+    if(lat == 0.0f && lon == 0.0f) {
+        snprintf(app->last_error, sizeof(app->last_error), "GPS not initialized (0,0)");
+        FURI_LOG_E("OSM", "write_point: refused lat=lon=0");
+        notification_message(app->notification, &sequence_error);
+        return false;
+    }
 
     FURI_LOG_D("OSM", "write_point: pre_save_check");
     if(!storage_pre_save_check(app->last_error, sizeof(app->last_error))) {
@@ -303,6 +330,27 @@ static bool quick_log_write_point(
 
     char tag[128];
     preset_build_tag(p, app->current_variant, tag, sizeof(tag));
+
+    // Note-as-value : si la valeur primaire du preset est un placeholder (ex. "TBD"
+    // pour House number) et que l'user a saisi une note qui tient comme valeur OSM,
+    // on remplace dans le tag. Ex. preset "addr:housenumber=TBD" + note "42" →
+    // tag final "addr:housenumber=42". La note est alors vidée pour éviter la duplication.
+    bool note_consumed_as_value = false;
+    if(is_placeholder_value(p->variants[0]) && note_is_safe_as_value(app->quick_note)) {
+        char* placeholder = strstr(tag, "=");
+        if(placeholder) {
+            // Préserve ce qui suit le placeholder (ex. ";source=survey")
+            char* sep = strchr(placeholder + 1, ';');
+            char after[96] = "";
+            if(sep) {
+                strncpy(after, sep, sizeof(after) - 1);
+                after[sizeof(after) - 1] = '\0';
+            }
+            snprintf(placeholder + 1, sizeof(tag) - (size_t)(placeholder + 1 - tag),
+                     "%s%s", app->quick_note, after);
+            note_consumed_as_value = true;
+        }
+    }
 
     // Survey mode : append les tags OSM standards "source=survey" + "survey:date=YYYY-MM-DD"
     // qui signalent à la community que la contribution a été vérifiée sur place.
@@ -319,10 +367,12 @@ static bool quick_log_write_point(
             dt_s.year, dt_s.month, dt_s.day);
     }
 
-    // Note finale (base + auto_photo_id + suffixe avg éventuel)
+    // Note finale (base + auto_photo_id + suffixe avg éventuel).
+    // Si la note a été consommée comme valeur de tag ci-dessus, on la retire
+    // du champ note pour éviter la redondance (elle est déjà dans le tag).
     char final_note[160];
     final_note[0] = '\0';
-    const char* base_note = app->quick_note[0] ? app->quick_note : NULL;
+    const char* base_note = (!note_consumed_as_value && app->quick_note[0]) ? app->quick_note : NULL;
 
     char photo_suffix[24] = "";
     if(app->settings.auto_photo_id) {
@@ -353,8 +403,11 @@ static bool quick_log_write_point(
     const char* cat_color =
         (p->category < PresetCatCount) ? PRESET_CATEGORY_COLORS[p->category] : "#c0c0c0";
     // L'icône OsmAnd est dérivée de la valeur primaire OSM (ex. "bench" → icône banc).
-    // Si OsmAnd n'a pas l'icône, il utilise une icône générique.
-    const char* icon_hint = (p->variants[0] && p->variants[0][0]) ? p->variants[0] : "special_marker";
+    // Si la valeur est un placeholder (TBD, ?, ...), fallback sur l'icône générique :
+    // sinon OsmAnd affiche un icon "TBD" cassé.
+    const char* icon_hint = (p->variants[0] && !is_placeholder_value(p->variants[0]))
+                                ? p->variants[0]
+                                : "special_marker";
 
     // ID OSM séquentiel : total_count est le nb de points existants,
     // le nouveau sera donc le (total_count + 1)-ième. Utilisé comme ID négatif
