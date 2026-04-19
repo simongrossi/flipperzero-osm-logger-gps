@@ -18,7 +18,7 @@ Une ligne JSON par point sauvegardé :
 | `alt`  | number   | Altitude en mètres (MSL depuis trame GGA), 1 décimale           |
 | `hdop` | number   | HDOP au moment du save (2 → 4 m, 1 → 2 m, 5+ = douteux)         |
 | `sats` | integer  | Nb de satellites utilisés pour le fix                           |
-| `tag`  | string   | Tag OSM formaté `key=value` (ex. `amenity=bench`)               |
+| `tag`  | string   | Tag OSM au format `key=value` ou tags multiples séparés par `;` (ex. `amenity=bench` ou `amenity=bench;material=wood` pour une variante à tag additionnel) |
 | `note` | string   | Note courte saisie via l'éditeur TextInput (Up dans Quick Log), chaîne vide sinon |
 
 **Point forcé** (OK long sans fix) : `lat=0`, `lon=0`, `alt=0`, `hdop=99.9` → ignorer ces points au post-traitement si besoin.

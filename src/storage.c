@@ -249,6 +249,272 @@ static const char TRACK_HEADER[] =
     "<trkseg>\n";
 static const char TRACK_FOOTER[] = "</trkseg>\n</trk>\n</gpx>\n";
 
+// --- Helpers lecture/troncature (pour Browse + Undo) ---
+
+// Lit tout le fichier en mémoire (max size_max octets). Retourne NULL si
+// le fichier n'existe pas, est trop gros, ou alloc échouée. Le buffer retourné
+// doit être free() par l'appelant et peut être muté en place.
+static char* read_whole_file(Storage* s, const char* path, uint32_t* out_size, uint32_t size_max) {
+    FileInfo fi;
+    if(storage_common_stat(s, path, &fi) != FSE_OK) return NULL;
+    if(fi.size == 0 || fi.size > size_max) return NULL;
+
+    File* f = storage_file_alloc(s);
+    if(!f) return NULL;
+    char* buf = NULL;
+    if(storage_file_open(f, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        buf = malloc((size_t)fi.size + 1);
+        if(buf) {
+            uint16_t read = storage_file_read(f, buf, (uint16_t)fi.size);
+            buf[read] = '\0';
+            if(out_size) *out_size = read;
+        }
+        storage_file_close(f);
+    }
+    storage_file_free(f);
+    return buf;
+}
+
+// Écrit un buffer en remplacement du contenu d'un fichier (CREATE_ALWAYS).
+static void rewrite_file(Storage* s, const char* path, const char* buf, size_t size) {
+    File* f = storage_file_alloc(s);
+    if(!f) return;
+    if(storage_file_open(f, path, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        if(size > 0) storage_file_write(f, buf, size);
+        storage_file_close(f);
+    }
+    storage_file_free(f);
+}
+
+// JSONL / CSV : supprime la dernière ligne (truncate avant le '\n' précédent).
+static bool trim_last_line(Storage* s, const char* path) {
+    uint32_t size = 0;
+    char* buf = read_whole_file(s, path, &size, 65536);
+    if(!buf) return false;
+    if(size == 0) { free(buf); return false; }
+
+    // trim trailing \n
+    size_t end = size;
+    if(end > 0 && buf[end - 1] == '\n') end--;
+    if(end > 0 && buf[end - 1] == '\r') end--;
+    // find previous \n
+    size_t prev = end;
+    while(prev > 0 && buf[prev - 1] != '\n') prev--;
+
+    rewrite_file(s, path, buf, prev);
+    free(buf);
+    return true;
+}
+
+// GPX : supprime le dernier <wpt>..</wpt> et réécrit le footer.
+static bool trim_last_gpx_wpt(Storage* s) {
+    const char* path = "/ext/apps_data/osm_logger/points.gpx";
+    uint32_t size = 0;
+    char* buf = read_whole_file(s, path, &size, 65536);
+    if(!buf) return false;
+
+    // Trouve la dernière occurrence de "  <wpt "
+    char* last = NULL;
+    for(char* p = buf; p + 7 < buf + size; p++) {
+        if(!memcmp(p, "  <wpt ", 7)) last = p;
+    }
+    if(!last) { free(buf); return false; }
+
+    size_t new_size = (size_t)(last - buf);
+    // Réécrit jusqu'à last, puis rajoute le footer
+    File* f = storage_file_alloc(s);
+    if(f && storage_file_open(f, path, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        storage_file_write(f, buf, new_size);
+        storage_file_write(f, GPX_FOOTER, sizeof(GPX_FOOTER) - 1);
+        storage_file_close(f);
+    }
+    if(f) storage_file_free(f);
+    free(buf);
+    return true;
+}
+
+// GeoJSON : supprime la dernière Feature et réécrit le footer.
+static bool trim_last_geojson_feature(Storage* s) {
+    const char* path = "/ext/apps_data/osm_logger/points.geojson";
+    uint32_t size = 0;
+    char* buf = read_whole_file(s, path, &size, 65536);
+    if(!buf) return false;
+
+    // Cherche la dernière occurrence de "  {\"type\":\"Feature\""
+    const char* marker = "  {\"type\":\"Feature\"";
+    size_t mlen = strlen(marker);
+    char* last = NULL;
+    for(char* p = buf; p + mlen < buf + size; p++) {
+        if(!memcmp(p, marker, mlen)) last = p;
+    }
+    if(!last) { free(buf); return false; }
+
+    // On veut tronquer juste avant la virgule+\n qui précède (ou juste après le header).
+    // Si last est précédé de ",\n" on tronque avant.
+    size_t cut = (size_t)(last - buf);
+    if(cut >= 2 && buf[cut - 1] == '\n' && buf[cut - 2] == ',') {
+        cut -= 2;
+    } else if(cut >= 1 && buf[cut - 1] == '\n') {
+        cut -= 1; // premier Feature, pas de virgule avant
+    }
+
+    File* f = storage_file_alloc(s);
+    if(f && storage_file_open(f, path, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        storage_file_write(f, buf, cut);
+        storage_file_write(f, GEOJSON_FOOTER, sizeof(GEOJSON_FOOTER) - 1);
+        storage_file_close(f);
+    }
+    if(f) storage_file_free(f);
+    free(buf);
+    return true;
+}
+
+bool storage_delete_last_point(void) {
+    Storage* s = furi_record_open(RECORD_STORAGE);
+    bool any = false;
+    if(trim_last_line(s, "/ext/apps_data/osm_logger/points.jsonl")) any = true;
+    if(trim_last_line(s, "/ext/apps_data/osm_logger/notes.csv")) any = true;
+    trim_last_gpx_wpt(s);       // best-effort
+    trim_last_geojson_feature(s); // best-effort
+    furi_record_close(RECORD_STORAGE);
+    return any;
+}
+
+void storage_clear_all_points(void) {
+    Storage* s = furi_record_open(RECORD_STORAGE);
+    storage_common_remove(s, "/ext/apps_data/osm_logger/points.jsonl");
+    storage_common_remove(s, "/ext/apps_data/osm_logger/notes.csv");
+    storage_common_remove(s, "/ext/apps_data/osm_logger/points.gpx");
+    storage_common_remove(s, "/ext/apps_data/osm_logger/points.geojson");
+    furi_record_close(RECORD_STORAGE);
+}
+
+// Extrait le contenu d'un champ JSON simple "key":"value" à partir de line.
+// Copie jusqu'à max_len - 1 caractères dans out. Retourne true si trouvé.
+static bool json_extract_string(
+    const char* line,
+    size_t line_len,
+    const char* key_quoted,
+    char* out,
+    size_t max_len) {
+    size_t klen = strlen(key_quoted);
+    if(klen >= line_len) return false;
+    for(size_t i = 0; i + klen < line_len; i++) {
+        if(!memcmp(&line[i], key_quoted, klen)) {
+            size_t j = i + klen;
+            if(j >= line_len || line[j] != ':') continue;
+            j++;
+            if(j >= line_len || line[j] != '"') continue;
+            j++;
+            // Copie jusqu'au " suivant
+            size_t o = 0;
+            while(j < line_len && line[j] != '"' && o < max_len - 1) {
+                out[o++] = line[j++];
+            }
+            out[o] = '\0';
+            return true;
+        }
+    }
+    return false;
+}
+
+uint8_t storage_read_last_points(char* out_lines, uint8_t max_lines, size_t line_size) {
+    if(!out_lines || max_lines == 0) return 0;
+    Storage* s = furi_record_open(RECORD_STORAGE);
+    uint32_t size = 0;
+    char* buf = read_whole_file(s, "/ext/apps_data/osm_logger/points.jsonl", &size, 65536);
+    furi_record_close(RECORD_STORAGE);
+    if(!buf || size == 0) {
+        if(buf) free(buf);
+        return 0;
+    }
+
+    // Trouve les offsets des N dernières lignes (séparateur \n).
+    uint32_t line_starts[32];
+    if(max_lines > 32) max_lines = 32;
+    uint8_t n_lines = 0;
+    size_t end = size;
+    if(end > 0 && buf[end - 1] == '\n') end--; // ignore trailing \n
+    size_t cursor = end;
+    while(n_lines < max_lines) {
+        // Cherche le \n précédent depuis cursor
+        size_t start = cursor;
+        while(start > 0 && buf[start - 1] != '\n') start--;
+        line_starts[n_lines++] = start;
+        if(start == 0) break;
+        cursor = start - 1; // saute le \n
+    }
+
+    // Reformate chaque ligne (de la plus récente à la plus ancienne)
+    for(uint8_t i = 0; i < n_lines; i++) {
+        size_t s0 = line_starts[i];
+        size_t s1 = (i == 0) ? end : line_starts[i - 1] - 1;
+        if(s1 > end) s1 = end;
+        size_t linelen = (s1 > s0) ? (s1 - s0) : 0;
+        const char* line = &buf[s0];
+
+        char time[32] = "?";
+        char tag[48] = "?";
+        json_extract_string(line, linelen, "\"time\"", time, sizeof(time));
+        json_extract_string(line, linelen, "\"tag\"", tag, sizeof(tag));
+
+        // Time est ISO "2026-04-19T10:42:18Z" -> on garde juste "10:42"
+        char short_time[6] = "--:--";
+        size_t tlen = strlen(time);
+        if(tlen >= 16) {
+            short_time[0] = time[11];
+            short_time[1] = time[12];
+            short_time[2] = ':';
+            short_time[3] = time[14];
+            short_time[4] = time[15];
+            short_time[5] = '\0';
+        }
+
+        char* dest = out_lines + (size_t)i * line_size;
+        snprintf(dest, line_size, "%s  %s", short_time, tag);
+    }
+
+    free(buf);
+    return n_lines;
+}
+
+bool storage_get_point_raw(uint8_t idx_from_end, char* out, size_t out_size) {
+    if(!out || out_size == 0) return false;
+    Storage* s = furi_record_open(RECORD_STORAGE);
+    uint32_t size = 0;
+    char* buf = read_whole_file(s, "/ext/apps_data/osm_logger/points.jsonl", &size, 65536);
+    furi_record_close(RECORD_STORAGE);
+    if(!buf || size == 0) {
+        if(buf) free(buf);
+        out[0] = '\0';
+        return false;
+    }
+
+    size_t end = size;
+    if(end > 0 && buf[end - 1] == '\n') end--;
+
+    // Parcourt les lignes depuis la fin
+    size_t cursor = end;
+    for(uint8_t i = 0; ; i++) {
+        size_t start = cursor;
+        while(start > 0 && buf[start - 1] != '\n') start--;
+        if(i == idx_from_end) {
+            size_t linelen = cursor - start;
+            if(linelen >= out_size) linelen = out_size - 1;
+            memcpy(out, &buf[start], linelen);
+            out[linelen] = '\0';
+            free(buf);
+            return true;
+        }
+        if(start == 0) break;
+        cursor = start - 1;
+    }
+
+    free(buf);
+    out[0] = '\0';
+    return false;
+}
+
 void storage_append_trkpt(float lat, float lon, float altitude, bool new_segment) {
     Storage* s = furi_record_open(RECORD_STORAGE);
     if(!ensure_dir(s)) {

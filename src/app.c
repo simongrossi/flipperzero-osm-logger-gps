@@ -15,24 +15,45 @@
 #include "track.h"
 #include "status.h"
 #include "about.h"
+#include "settings.h"
+#include "last_points.h"
+#include "point_detail.h"
 #include "presets.h"
 #include "storage_helpers.h"
 
 // --- Forward
 static void app_menu_callback(void* ctx, uint32_t index);
 static void preset_menu_callback(void* ctx, uint32_t index);
+static void serial_rx_callback(
+    FuriHalSerialHandle* handle, FuriHalSerialRxEvent event, void* context);
 
 typedef enum {
     MenuItemQuickLog = 0,
     MenuItemTrack = 1,
-    MenuItemStatus = 2,
-    MenuItemAbout = 3,
+    MenuItemLastPoints = 2,
+    MenuItemStatus = 3,
+    MenuItemSettings = 4,
+    MenuItemAbout = 5,
 } MenuItem;
 
 // Back depuis le menu principal -> on sort de l'app
 static bool app_navigation_callback(void* ctx) {
     (void)ctx;
     return false; // false => view_dispatcher_run s'arrête
+}
+
+// Reconfigure l'UART GPS avec le baud courant des settings. Safe à appeler
+// en cours de route, réinit proprement le handle série.
+void app_reconfigure_uart(App* app) {
+    if(!app->serial) return;
+    furi_hal_serial_async_rx_stop(app->serial);
+    furi_hal_serial_deinit(app->serial);
+    furi_hal_serial_init(app->serial, app->settings.baud_rate);
+    furi_hal_serial_async_rx_start(app->serial, serial_rx_callback, app, false);
+    // Reset des compteurs de diag pour repartir propre à l'œil
+    app->nmea_bytes_rx = 0;
+    app->nmea_lines_rx = 0;
+    app->nmea_pos = 0;
 }
 
 // Back depuis le sous-menu des presets -> retour au menu principal
@@ -47,8 +68,15 @@ static void app_tick_callback(void* ctx) {
     App* app = (App*)ctx;
     if(app->pending_fix_notify) {
         app->pending_fix_notify = false;
-        notification_message(app->notification, &sequence_success);
-        FURI_LOG_I("OSM", "GPS fix acquired");
+        // Cooldown 10 s : évite le spam si le fix flippe entre trames RMC et GGA
+        uint32_t now = furi_get_tick();
+        uint32_t freq = furi_kernel_get_tick_frequency();
+        uint32_t cooldown_ticks = 10 * (freq ? freq : 1);
+        if(app->last_notify_tick == 0 || (now - app->last_notify_tick) >= cooldown_ticks) {
+            app->last_notify_tick = now;
+            notification_message(app->notification, &sequence_success);
+            FURI_LOG_I("OSM", "GPS fix acquired");
+        }
     }
     quick_log_refresh(app);
     track_refresh(app);
@@ -72,10 +100,11 @@ static void serial_rx_callback(FuriHalSerialHandle* handle, FuriHalSerialRxEvent
 
                     bool has_fix = false;
                     float lat = 0, lon = 0, hdop = 99.9f, altitude = 0;
+                    float heading = app->heading_deg; // garde la dernière valeur si la trame ne la fournit pas
                     uint8_t sats = 0;
 
                     nmea_parse_line(
-                        app->nmea_line, &has_fix, &lat, &lon, &hdop, &sats, &altitude);
+                        app->nmea_line, &has_fix, &lat, &lon, &hdop, &sats, &altitude, &heading);
 
                     bool was_fix = app->has_fix;
                     app->has_fix = has_fix;
@@ -83,8 +112,11 @@ static void serial_rx_callback(FuriHalSerialHandle* handle, FuriHalSerialRxEvent
                     app->lon = lon;
                     app->hdop = hdop;
                     app->altitude = altitude;
+                    app->heading_deg = heading;
                     app->sats = sats;
-                    if(has_fix) {
+                    // Anti-fantôme : un "fix" sans coords réelles ne compte pas
+                    bool real_fix = has_fix && (lat != 0.0f || lon != 0.0f);
+                    if(real_fix) {
                         app->last_fix_tick = furi_get_tick();
                         if(!was_fix) app->pending_fix_notify = true;
                     }
@@ -110,8 +142,12 @@ static void app_menu_callback(void* ctx, uint32_t index) {
         view_dispatcher_switch_to_view(app->dispatcher, AppViewPresets);
     } else if(index == MenuItemTrack) {
         app_start_track(app);
+    } else if(index == MenuItemLastPoints) {
+        app_start_last_points(app);
     } else if(index == MenuItemStatus) {
         app_start_status(app);
+    } else if(index == MenuItemSettings) {
+        app_start_settings(app);
     } else if(index == MenuItemAbout) {
         app_start_about(app);
     }
@@ -158,6 +194,9 @@ int32_t app(void* p) {
     view_dispatcher_set_tick_event_callback(app->dispatcher, app_tick_callback, 500);
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
 
+    // Charge les settings persistés (baud rate, intervalle trace) -> defaults si absent
+    settings_load(&app->settings);
+
     // Init des presets (depuis SD si dispo, sinon defaults)
     presets_init();
 
@@ -171,7 +210,11 @@ int32_t app(void* p) {
     submenu_add_item(
         app->menu, "Track mode (auto GPX)", MenuItemTrack, app_menu_callback, app);
     submenu_add_item(
+        app->menu, "Last points (browse/undo)", MenuItemLastPoints, app_menu_callback, app);
+    submenu_add_item(
         app->menu, "GPS status", MenuItemStatus, app_menu_callback, app);
+    submenu_add_item(
+        app->menu, "Settings", MenuItemSettings, app_menu_callback, app);
     submenu_add_item(
         app->menu, "About", MenuItemAbout, app_menu_callback, app);
     View* menu_view = submenu_get_view(app->menu);
@@ -208,9 +251,9 @@ int32_t app(void* p) {
     app->expansion = furi_record_open(RECORD_EXPANSION);
     expansion_disable(app->expansion);
 
-    // --- UART init (SDK récent) ---
+    // --- UART init (baudrate depuis les settings) ---
     app->serial = furi_hal_serial_control_acquire(FuriHalSerialIdUsart);
-    furi_hal_serial_init(app->serial, 9600);
+    furi_hal_serial_init(app->serial, app->settings.baud_rate);
     furi_hal_serial_async_rx_start(app->serial, serial_rx_callback, app, false);
 
     // UI loop
@@ -233,6 +276,9 @@ int32_t app(void* p) {
     app_stop_track(app);
     app_stop_status(app);
     app_stop_about(app);
+    app_stop_settings(app);
+    app_stop_last_points(app);
+    app_stop_point_detail(app);
 
     if(app->note_input) {
         view_dispatcher_remove_view(app->dispatcher, AppViewNote);

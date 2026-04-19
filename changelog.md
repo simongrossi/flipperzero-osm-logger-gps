@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3 — 2026-04-19
+
+### Added
+- **Last points browser** : nouvelle vue "Last points (browse/undo)" accessible depuis le menu principal. Liste les 10 derniers saves sous la forme `HH:MM  tag`. Actions en bas de liste : **Delete last** (supprime le dernier point des 4 fichiers : JSONL, CSV, GPX, GeoJSON) et **Clear all** (wipe de tous les fichiers de points + reset des compteurs).
+- **Point detail view** : clic sur un point dans la liste Last Points → écran avec détails complets (time ISO, tag, lat/lon 6 décimales, altitude, HDOP, sats, note).
+- **Variantes = tags additionnels** : un preset peut désormais avoir des variantes qui ajoutent un tag secondaire (pas juste une valeur alternative). Exemple `Bench` → `amenity=bench` / `amenity=bench;material=wood` / `amenity=bench;material=metal`. Les variantes contenant `=` deviennent des tags additionnels, les autres restent des valeurs alternatives.
+- **Filtre de distance en mode trace** : setting `Track min dist` (off / 2m / 5m / 10m) — skip les trkpts trop proches du précédent. Calcul haversine approx (équirectangulaire, <1% erreur à l'échelle km).
+- **HDOP strict en mode trace** : toggle `Track HDOP strict` dans Settings — rejette les trkpts quand HDOP > 2.5 (comme le gate Quick Log).
+- **Preview avant save** : toggle `Preview save` dans Settings. OK court sur Quick Log ouvre une vue de confirmation avec tag/coords/HDOP/note avant le vrai save. OK long court-circuite le preview.
+- **Cap / heading** parsé depuis `$GPRMC` champ 8, affiché en mode trace (`hdg=225°`).
+- **Badge batterie** `%%` en haut à droite sur Quick Log, Track et GPS Status.
+
+### Changed
+- **Tag multi-valué** dans les fichiers de sortie : quand une variante additionnelle est utilisée, le champ `tag` contient maintenant des tags séparés par `;` (ex. `amenity=bench;material=wood`).
+- **`settings.txt`** : nouveau fichier `/ext/apps_data/osm_logger/settings.txt` persiste les préférences (baud_rate, track_interval_s, track_min_dist_m, track_hdop_strict, preview_before_save).
+- **Parser NMEA** : extraction de lat/lon depuis GGA aussi (pas seulement RMC) — corrige un bug où les coordonnées restaient à 0 quand GGA indiquait un fix mais RMC pas encore.
+
+### Fixed
+- Cooldown de 10 s sur la notification "fix acquired" pour éviter le spam si le fix flippe entre trames RMC et GGA.
+
 ## 0.2 — 2026-04-19
 
 ### Added

@@ -1,4 +1,5 @@
 #include <furi.h>
+#include <furi_hal_power.h>
 #include <gui/canvas.h>
 #include <gui/view_dispatcher.h>
 #include <gui/view.h>
@@ -31,6 +32,7 @@ typedef struct {
     uint32_t total_count;
     uint32_t fix_age_s;
     bool fix_ever;
+    bool preview_pending;
     char note[64];
 } QuickLogModel;
 
@@ -41,6 +43,44 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     if(!p) return;
 
     canvas_clear(canvas);
+
+    // Mode preview (confirmation) : écran distinct et pédagogique.
+    if(m->preview_pending) {
+        canvas_set_font(canvas, FontPrimary);
+        elements_multiline_text_aligned(
+            canvas, 64, 2, AlignCenter, AlignTop, "Save this point?");
+
+        canvas_set_font(canvas, FontSecondary);
+        char tag[64];
+        preset_build_tag(p, m->variant_idx, tag, sizeof(tag));
+        elements_multiline_text_aligned(canvas, 64, 18, AlignCenter, AlignTop, tag);
+
+        char line[80];
+        if(m->has_fix) {
+            snprintf(line, sizeof(line), "%.6f, %.6f", (double)m->lat, (double)m->lon);
+        } else {
+            snprintf(line, sizeof(line), "NO FIX (will save 0,0)");
+        }
+        elements_multiline_text_aligned(canvas, 64, 30, AlignCenter, AlignTop, line);
+
+        snprintf(line, sizeof(line), "HDOP=%.1f sats=%u", (double)m->hdop, m->sats);
+        elements_multiline_text_aligned(canvas, 64, 40, AlignCenter, AlignTop, line);
+
+        if(m->note[0]) {
+            snprintf(line, sizeof(line), "note: %s", m->note);
+            elements_multiline_text_aligned(canvas, 64, 50, AlignCenter, AlignTop, line);
+        }
+
+        elements_multiline_text_aligned(
+            canvas, 64, 62, AlignCenter, AlignBottom, "OK=save  Back=cancel");
+        return;
+    }
+
+    // Badge batterie en haut à droite
+    char bat[8];
+    snprintf(bat, sizeof(bat), "%u%%", (unsigned)furi_hal_power_get_pct());
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 127, 2, AlignRight, AlignTop, bat);
 
     // Header : label du preset (avec marqueur de variante si plusieurs)
     canvas_set_font(canvas, FontPrimary);
@@ -58,11 +98,9 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
         elements_multiline_text_aligned(canvas, 64, 2, AlignCenter, AlignTop, p->label);
     }
 
-    // Tag OSM : valeur dépend de la variante courante
-    const char* val = preset_value(p, m->variant_idx);
-    if(!val) val = "?";
-    char tag[48];
-    snprintf(tag, sizeof(tag), "%s=%s", p->key, val);
+    // Tag OSM effectif (variantes simples OU tags additionnels)
+    char tag[64];
+    preset_build_tag(p, m->variant_idx, tag, sizeof(tag));
     canvas_set_font(canvas, FontSecondary);
     elements_multiline_text_aligned(canvas, 64, 16, AlignCenter, AlignTop, tag);
 
@@ -111,12 +149,57 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     }
 }
 
+static bool quick_log_do_save(App* app, bool force) {
+    const Preset* p = presets_get(app->current_preset);
+    if(!p) p = presets_get(0);
+    if(!p) return false;
+
+    bool quality_ok = app->has_fix && (app->hdop <= HDOP_MAX);
+    if(!quality_ok && !force) {
+        notification_message(app->notification, &sequence_error);
+        return false;
+    }
+
+    char tag[64];
+    preset_build_tag(p, app->current_variant, tag, sizeof(tag));
+    const char* note = app->quick_note[0] ? app->quick_note : NULL;
+    storage_write_all_formats(
+        app->lat, app->lon, app->altitude, app->hdop, app->sats, tag, note);
+    app->session_count++;
+    app->total_count++;
+    notification_message(app->notification, &sequence_success);
+    return true;
+}
+
 static bool quick_log_input_callback(InputEvent* event, void* ctx) {
     App* app = (App*)ctx;
 
     bool ok_short = (event->type == InputTypeShort && event->key == InputKeyOk);
     bool ok_long = (event->type == InputTypeLong && event->key == InputKeyOk);
     bool is_press = (event->type == InputTypeShort || event->type == InputTypeRepeat);
+
+    // Mode preview (confirmation) : gestion spéciale des touches
+    if(app->preview_pending) {
+        if(ok_short) {
+            quick_log_do_save(app, false); // force=false : respecte gate HDOP
+            app->preview_pending = false;
+            quick_log_refresh(app);
+            return true;
+        }
+        if(ok_long) {
+            quick_log_do_save(app, true); // force=true : ignore gate
+            app->preview_pending = false;
+            quick_log_refresh(app);
+            return true;
+        }
+        if(event->type == InputTypeShort && event->key == InputKeyBack) {
+            // Annule le preview, reste sur Quick Log
+            app->preview_pending = false;
+            quick_log_refresh(app);
+            return true;
+        }
+        return true; // en preview, on bloque les autres touches
+    }
 
     // ←/→ : cycle sur les variantes du preset courant
     if(is_press && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
@@ -148,28 +231,15 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
     }
 
     if(ok_short || ok_long) {
-        bool force = ok_long;
-        bool quality_ok = app->has_fix && (app->hdop <= HDOP_MAX);
-
-        if(!quality_ok && !force) {
-            notification_message(app->notification, &sequence_error);
+        // Si preview activé et OK court : aller en mode preview au lieu de sauver direct.
+        // OK long court-circuite toujours le preview (force save).
+        if(ok_short && app->settings.preview_before_save) {
+            app->preview_pending = true;
+            quick_log_refresh(app);
             return true;
         }
-
-        const Preset* p = presets_get(app->current_preset);
-        if(!p) p = presets_get(0);
-        if(!p) return true;
-        const char* val = preset_value(p, app->current_variant);
-        if(!val) val = "";
-        char tag[48];
-        snprintf(tag, sizeof(tag), "%s=%s", p->key, val);
-        const char* note = app->quick_note[0] ? app->quick_note : NULL;
-        storage_write_all_formats(
-            app->lat, app->lon, app->altitude, app->hdop, app->sats, tag, note);
-        app->session_count++;
-        app->total_count++;
+        quick_log_do_save(app, ok_long);
         quick_log_refresh(app);
-        notification_message(app->notification, &sequence_success);
         return true;
     }
 
@@ -218,6 +288,7 @@ void quick_log_refresh(App* app) {
             m->total_count = app->total_count;
             m->fix_age_s = age_s;
             m->fix_ever = fix_ever;
+            m->preview_pending = app->preview_pending;
             strncpy(m->note, app->quick_note, sizeof(m->note) - 1);
             m->note[sizeof(m->note) - 1] = '\0';
         },

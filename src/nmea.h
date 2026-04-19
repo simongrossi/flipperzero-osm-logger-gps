@@ -9,4 +9,5 @@ void nmea_parse_line(
     float* lon,
     float* hdop,
     uint8_t* sats,
-    float* altitude);
+    float* altitude,
+    float* heading_deg);

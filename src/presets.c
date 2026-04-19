@@ -13,10 +13,11 @@
 // Note : on peut ajouter des variantes en mettant plusieurs valeurs et en
 // ajustant variant_count. Ex. {"Fontaine", "amenity", {"drinking_water", "fountain"}, 2}.
 static const Preset DEFAULT_PRESETS[] = {
-    {"Bench", "amenity", {"bench"}, 1},
+    // Exemple de variantes mélangées : valeurs alternatives + tags additionnels
+    {"Bench", "amenity", {"bench", "material=wood", "material=metal", "material=concrete"}, 4},
     {"Waste basket", "amenity", {"waste_basket"}, 1},
-    {"Drinking water", "amenity", {"drinking_water", "fountain"}, 2},
-    {"Toilets", "amenity", {"toilets"}, 1},
+    {"Drinking water", "amenity", {"drinking_water", "fountain", "bottle=yes"}, 3},
+    {"Toilets", "amenity", {"toilets", "fee=yes", "wheelchair=yes"}, 3},
     {"Street lamp", "highway", {"street_lamp"}, 1},
     {"Post box", "amenity", {"post_box"}, 1},
     {"Info board", "tourism", {"information"}, 1},
@@ -192,4 +193,22 @@ const char* preset_value(const Preset* p, uint8_t variant_idx) {
     if(!p || p->variant_count == 0) return NULL;
     if(variant_idx >= p->variant_count) variant_idx = 0;
     return p->variants[variant_idx];
+}
+
+size_t preset_build_tag(const Preset* p, uint8_t variant_idx, char* out, size_t out_size) {
+    if(!p || !out || out_size == 0) return 0;
+    const char* v = preset_value(p, variant_idx);
+    if(!v) {
+        out[0] = '\0';
+        return 0;
+    }
+    // Variante "k=v" -> tag additionnel au primaire
+    if(strchr(v, '=')) {
+        const char* primary = p->variants[0] ? p->variants[0] : "";
+        int n = snprintf(out, out_size, "%s=%s;%s", p->key, primary, v);
+        return n > 0 ? (size_t)n : 0;
+    }
+    // Variante valeur : key=value simple
+    int n = snprintf(out, out_size, "%s=%s", p->key, v);
+    return n > 0 ? (size_t)n : 0;
 }

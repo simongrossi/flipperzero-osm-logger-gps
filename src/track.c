@@ -1,4 +1,5 @@
 #include <furi.h>
+#include <furi_hal_power.h>
 #include <gui/canvas.h>
 #include <gui/view_dispatcher.h>
 #include <gui/view.h>
@@ -6,14 +7,26 @@
 #include <input/input.h>
 #include <notification/notification.h>
 #include <notification/notification_messages.h>
+#include <math.h>
 #include <stdio.h>
 
 #include "app.h"
 #include "track.h"
 #include "storage_helpers.h"
 
-// Intervalle entre deux trkpts
-#define TRACK_TICK_MS 5000
+// Distance équirectangulaire en mètres (<1% d'erreur sur quelques km).
+static float approx_distance_m(float lat1, float lon1, float lat2, float lon2) {
+    const float DEG_TO_RAD = 0.01745329f;
+    const float M_PER_DEG_LAT = 110574.0f;
+    float avg_lat_rad = (lat1 + lat2) * 0.5f * DEG_TO_RAD;
+    float m_per_deg_lon = 111320.0f * cosf(avg_lat_rad);
+    float dlat = (lat2 - lat1) * M_PER_DEG_LAT;
+    float dlon = (lon2 - lon1) * m_per_deg_lon;
+    return sqrtf(dlat * dlat + dlon * dlon);
+}
+
+// Intervalle entre deux trkpts : lu depuis app->settings.track_interval_s
+// au moment de l'entrée dans la vue. Default 5 s si settings pas chargés.
 
 typedef struct {
     bool has_fix;
@@ -21,9 +34,11 @@ typedef struct {
     float lon;
     float hdop;
     float altitude;
+    float heading_deg;
     uint8_t sats;
     uint32_t points;
     uint32_t duration_s;
+    uint8_t interval_s;
     bool active;
 } TrackModel;
 
@@ -46,30 +61,49 @@ void track_refresh(App* app) {
             m->lon = app->lon;
             m->hdop = app->hdop;
             m->altitude = app->altitude;
+            m->heading_deg = app->heading_deg;
             m->sats = app->sats;
             m->points = app->track_points;
             m->duration_s = duration;
+            m->interval_s = app->settings.track_interval_s;
             m->active = (app->track_timer != NULL);
         },
         true);
 }
 
-// Callback du timer : écrit un trkpt si on a un fix
+// Callback du timer : écrit un trkpt si on a un fix (et si assez éloigné du précédent)
 static void track_timer_callback(void* ctx) {
     App* app = (App*)ctx;
-    if(!app->has_fix) return; // pas de fix -> on saute ce tick
+    if(!app->has_fix) return;
+
+    // Si HDOP strict activé, refuser les fixes dégradés (> 2.5)
+    if(app->settings.track_hdop_strict && app->hdop > 2.5f) return;
+
+    // Filtre de distance : skip si on n'a pas assez bougé depuis le dernier trkpt.
+    uint8_t min_dist = app->settings.track_min_dist_m;
+    if(min_dist > 0 && app->last_trk_valid && !app->track_new_segment) {
+        float d = approx_distance_m(
+            app->last_trk_lat, app->last_trk_lon, app->lat, app->lon);
+        if(d < (float)min_dist) return;
+    }
 
     storage_append_trkpt(app->lat, app->lon, app->altitude, app->track_new_segment);
     app->track_new_segment = false;
     app->track_points++;
-    // note : le rafraîchissement visuel passe par le tick callback du ViewDispatcher
-    // (qui appelle track_refresh via app.c), pas besoin de le faire ici.
+    app->last_trk_lat = app->lat;
+    app->last_trk_lon = app->lon;
+    app->last_trk_valid = true;
 }
 
 static void track_draw_callback(Canvas* canvas, void* ctx) {
     TrackModel* m = (TrackModel*)ctx;
 
     canvas_clear(canvas);
+
+    char bat[8];
+    snprintf(bat, sizeof(bat), "%u%%", (unsigned)furi_hal_power_get_pct());
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 127, 2, AlignRight, AlignTop, bat);
 
     canvas_set_font(canvas, FontPrimary);
     elements_multiline_text_aligned(
@@ -84,10 +118,10 @@ static void track_draw_callback(Canvas* canvas, void* ctx) {
         snprintf(
             line2,
             sizeof(line2),
-            "HDOP=%.1f sats=%u alt=%.0fm",
+            "HDOP=%.1f sats=%u hdg=%.0f\xb0",
             (double)m->hdop,
             m->sats,
-            (double)m->altitude);
+            (double)m->heading_deg);
     } else {
         snprintf(line1, sizeof(line1), "Waiting for fix...");
         snprintf(line2, sizeof(line2), "sats=%u", m->sats);
@@ -106,8 +140,10 @@ static void track_draw_callback(Canvas* canvas, void* ctx) {
         (unsigned long)h, (unsigned long)min, (unsigned long)s);
     elements_multiline_text_aligned(canvas, 64, 42, AlignCenter, AlignTop, line3);
 
-    elements_multiline_text_aligned(
-        canvas, 64, 62, AlignCenter, AlignBottom, "Auto-log 5s  Back to stop");
+    char footer[48];
+    snprintf(
+        footer, sizeof(footer), "Auto-log %us  Back to stop", (unsigned)m->interval_s);
+    elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, footer);
 }
 
 static bool track_input_callback(InputEvent* event, void* ctx) {
@@ -124,17 +160,21 @@ static uint32_t track_previous_callback(void* ctx) {
 static void track_enter(void* ctx) {
     App* app = (App*)ctx;
 
-    // Démarre la session : flag nouveau segment, reset compteurs
+    // Démarre la session : flag nouveau segment, reset compteurs + filtre distance
     app->track_new_segment = true;
     app->track_points = 0;
     app->track_start_tick = furi_get_tick();
+    app->last_trk_valid = false;
 
     if(!app->track_timer) {
         app->track_timer =
             furi_timer_alloc(track_timer_callback, FuriTimerTypePeriodic, app);
     }
     if(app->track_timer) {
-        furi_timer_start(app->track_timer, furi_ms_to_ticks(TRACK_TICK_MS));
+        uint32_t interval_ms = app->settings.track_interval_s > 0
+                                   ? (uint32_t)app->settings.track_interval_s * 1000u
+                                   : 5000u;
+        furi_timer_start(app->track_timer, furi_ms_to_ticks(interval_ms));
     }
 
     track_refresh(app);

@@ -1,4 +1,5 @@
 #include <furi.h>
+#include <furi_hal_power.h>
 #include <gui/canvas.h>
 #include <gui/view_dispatcher.h>
 #include <gui/view.h>
@@ -26,6 +27,11 @@ static void status_draw_callback(Canvas* canvas, void* ctx) {
     StatusModel* m = (StatusModel*)ctx;
 
     canvas_clear(canvas);
+
+    char bat[8];
+    snprintf(bat, sizeof(bat), "%u%%", (unsigned)furi_hal_power_get_pct());
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str_aligned(canvas, 127, 2, AlignRight, AlignTop, bat);
 
     canvas_set_font(canvas, FontPrimary);
     elements_multiline_text_aligned(

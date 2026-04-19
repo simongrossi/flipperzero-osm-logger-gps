@@ -10,21 +10,26 @@
 
 ## ✨ Features
 
-- **NMEA 0183** GPS reader (RMC + GGA) over UART 9600
+- **NMEA 0183** GPS reader (RMC + GGA) over UART, configurable baud rate (4800 / 9600 / 19200 / 38400 / 57600 / 115200)
 - Auto-notification (vibration + green LED) when GPS fix is acquired
+- **Battery badge** displayed on every live screen
 - **GPS Status** screen: fix, lat/lon, altitude, HDOP, satellites, fix age, live NMEA RX counters
+- **Settings menu** with persisted prefs on SD: baud rate, track interval, track min distance filter (off / 2 / 5 / 10 m), track HDOP strict toggle, preview-before-save toggle
 - **Quick Log (waypoints)** mode:
   - Submenu of **23 OSM presets** by default, grouped by category (street furniture, roads, shops, emergency…)
   - **SD-loadable presets**: drop a `presets.txt` on the SD to replace the built-in list without recompiling
-  - **Preset variants** (e.g. Cafe / Pub / Bar / Fast food) cycled with `←` / `→`
+  - **Preset variants** cyclable with `←` / `→` — alternative values *or* additional secondary tags (e.g. `Bench` → `amenity=bench` → `amenity=bench;material=wood`)
   - **Short note editor** via `Up` (Flipper TextInput), `Down` to clear
   - Live screen: coords, altitude, HDOP, sats, fix age, session + cumulative counters
-  - **Short `OK`**: save if `fix OK` and `HDOP ≤ 2.5`, error tone otherwise
-  - **Long `OK`**: force save regardless of fix quality
+  - **Short `OK`**: save if `fix OK` and `HDOP ≤ 2.5`, error tone otherwise (or preview screen if enabled)
+  - **Long `OK`**: force save regardless of fix quality, bypasses preview
 - **Track mode (auto GPX log)**:
-  - Writes a `<trkpt>` every 5 s while the view is active and a fix is available
+  - `<trkpt>` written every N seconds while the view is active and a fix is available
+  - Distance filter: skips points that didn't move far enough (configurable threshold)
+  - Heading / course over ground displayed live
   - Each session starts a new `<trkseg>` (no bogus line between separate sessions)
   - Ideal for mapping a street or path on foot or bike
+- **Last points browser** (main menu entry): scrollable list of the 10 most recent saves. Tap any point to see full details (time, coords, altitude, HDOP, sats, tag, note). Actions: **Delete last** (undo across all 4 output files) and **Clear all** (new session).
 - Saves to `/ext/apps_data/osm_logger/` in **5 native formats** (all valid at all times):
   - `points.jsonl` — one JSON line per point
   - `notes.csv` — spreadsheet-friendly
@@ -163,10 +168,10 @@ The main menu also has `GPS status` (dedicated diagnostic view) and `About`.
 See **[docs/ROADMAP.md](docs/ROADMAP.md)** for the full list of planned features with implementation hints.
 
 Short summary:
-- Custom launcher icon
-- Configurable track interval (fixed at 5 s today)
 - Preset variants as additional tags (not just alternative values)
 - Sub-categories in the preset menu
+- Distance filter in track mode (skip points that didn't move)
+- Persistent notes across sessions
 - Persistent notes across sessions
 - Support for other GPS modules (PA1010D, BN-180, etc.)
 

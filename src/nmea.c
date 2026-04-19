@@ -120,7 +120,8 @@ void nmea_parse_line(
     float* lon,
     float* hdop,
     uint8_t* sats,
-    float* altitude) {
+    float* altitude,
+    float* heading_deg) {
     if(!line) return;
 
     if(has_fix) *has_fix = false;
@@ -130,36 +131,48 @@ void nmea_parse_line(
     if(nf < 1) return;
 
     if(starts_with(line, "$GPRMC") || starts_with(line, "$GNRMC")) {
-        // RMC: 0:$GPRMC,1:time,2:status(A/V),3:lat,4:N/S,5:lon,6:E/W
+        // RMC: 0:$GPRMC,1:time,2:status(A/V),3:lat,4:N/S,5:lon,6:E/W,7:speed,8:course
         if(nf >= 7) {
             bool active = (f[2].len == 1 && (f[2].p[0] == 'A' || f[2].p[0] == 'a'));
-            float latv = 0.0f;
-            float lonv = 0.0f;
+            if(has_fix) *has_fix = active;
             if(active) {
-                if(f[3].len) {
-                    latv = nmea_degmin_to_deg_str(f[3].p, f[3].len);
+                if(lat && f[3].len) {
+                    float latv = nmea_degmin_to_deg_str(f[3].p, f[3].len);
                     if(f[4].len == 1 && (f[4].p[0] == 'S' || f[4].p[0] == 's')) latv = -latv;
+                    *lat = latv;
                 }
-                if(f[5].len) {
-                    lonv = nmea_degmin_to_deg_str(f[5].p, f[5].len);
+                if(lon && f[5].len) {
+                    float lonv = nmea_degmin_to_deg_str(f[5].p, f[5].len);
                     if(f[6].len == 1 && (f[6].p[0] == 'W' || f[6].p[0] == 'w')) lonv = -lonv;
+                    *lon = lonv;
+                }
+                if(heading_deg && nf >= 9 && f[8].len) {
+                    *heading_deg = parse_float_simple(f[8].p, f[8].len);
                 }
             }
-            if(has_fix) *has_fix = active;
-            if(lat) *lat = latv;
-            if(lon) *lon = lonv;
         }
         return;
     }
 
     if(starts_with(line, "$GPGGA") || starts_with(line, "$GNGGA")) {
-        // GGA: 0:$GPGGA,...,6:fix,7:sats,8:hdop,9:altitude,10:unit(M)
+        // GGA: 0:$GPGGA,1:time,2:lat,3:N/S,4:lon,5:E/W,
+        //      6:fix_quality,7:sats,8:hdop,9:altitude,10:unit(M)
         if(nf >= 9) {
             int quality = 0;
             if(f[6].len && f[6].p[0] >= '0' && f[6].p[0] <= '8') {
                 quality = (int)(f[6].p[0] - '0');
             }
-            if(has_fix) *has_fix = (quality > 0);
+            bool fix_ok = (quality > 0) && f[2].len > 0 && f[4].len > 0;
+            if(has_fix) *has_fix = fix_ok;
+
+            if(fix_ok) {
+                float latv = nmea_degmin_to_deg_str(f[2].p, f[2].len);
+                if(f[3].len == 1 && (f[3].p[0] == 'S' || f[3].p[0] == 's')) latv = -latv;
+                float lonv = nmea_degmin_to_deg_str(f[4].p, f[4].len);
+                if(f[5].len == 1 && (f[5].p[0] == 'W' || f[5].p[0] == 'w')) lonv = -lonv;
+                if(lat) *lat = latv;
+                if(lon) *lon = lonv;
+            }
 
             if(sats) {
                 uint32_t v = 0;

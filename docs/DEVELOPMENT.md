@@ -6,14 +6,17 @@
 src/
   osm_logger.c       # entry point (redirige vers app)
   app.h / app.c      # struct App, init/teardown, ViewDispatcher, ISR UART, tick
-  nmea.h / nmea.c    # parser NMEA (RMC, GGA) sans atof/strtok
-  quick_log.h / .c   # écran Quick Log (waypoint) + variantes + note
-  track.h / .c       # écran Mode trace (auto-log GPX) + FuriTimer
+  nmea.h / nmea.c    # parser NMEA (RMC, GGA) sans atof/strtok (+ heading)
+  quick_log.h / .c   # écran Quick Log + variantes + note + mode preview
+  track.h / .c       # écran Mode trace + FuriTimer + filtre distance + heading
   status.h / .c      # écran Statut GPS diagnostic
   about.h / .c       # écran About (auteur, lien GitHub, licence)
+  settings.h / .c    # Settings persistés sur SD + écran dédié (VariableItemList)
+  last_points.h / .c # browser des N derniers points + actions Delete last / Clear all
+  point_detail.h / .c# écran de détail d'un point (cliqué depuis Last points)
   presets.h / .c     # loader de presets (fichier SD + fallback defaults + variantes)
   storage_helpers.h  # API publique du module storage
-  storage.c          # écriture JSONL + CSV + GPX + GeoJSON + track.gpx
+  storage.c          # écriture + lecture + suppression des fichiers de sortie
 application.fam      # manifest ufbt
 ```
 
@@ -27,7 +30,10 @@ application.fam      # manifest ufbt
 | 3  | `AppViewTrack`    | View+model   | `AppViewMenu` (previous_callback) |
 | 4  | `AppViewStatus`   | View+model   | `AppViewMenu` (previous_callback) |
 | 5  | `AppViewNote`     | TextInput    | retour Quick Log via result callback |
-| 6  | `AppViewAbout`    | View (static)| `AppViewMenu` (previous_callback) |
+| 6  | `AppViewAbout`    | View (static)    | `AppViewMenu` (previous_callback) |
+| 7  | `AppViewSettings` | VariableItemList | `AppViewMenu` (previous_callback) |
+| 8  | `AppViewLastPoints` | Submenu (dynamic)| `AppViewMenu` (previous_callback) |
+| 9  | `AppViewPointDetail` | View (static) | `AppViewLastPoints` (previous_callback) |
 
 ### Vue Quick Log : view model + tick refresh
 
