@@ -107,7 +107,7 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
         elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, footer);
     } else {
         elements_multiline_text_aligned(
-            canvas, 64, 62, AlignCenter, AlignBottom, "OK save  Up:note  <>:variant");
+            canvas, 64, 62, AlignCenter, AlignBottom, "OK save  Up:note  <>:var");
     }
 }
 

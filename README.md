@@ -1,147 +1,165 @@
 # flipperzero-osm-logger-gps
 
-> Logger de **POI OSM** sur le terrain avec **Flipper Zero** + **GPS NEO-6M V2** :
-> choisir un type de point (banc, poubelle, fontaine, défibrillateur…) et le sauvegarder
-> sur microSD avec position, altitude, timestamp et tag OSM.
+> Log **OSM POIs** in the field with a **Flipper Zero** + **NEO-6M GPS** :
+> pick a POI type (bench, bin, drinking water, defibrillator…), save lat/lon/alt/timestamp/OSM tag
+> to microSD in **5 native formats** (JSONL, CSV, GPX, GeoJSON, GPX track).
 
-![icône osm_logger](osm_logger.png)
-
----
-
-## ✨ Fonctionnalités
-
-- Lecture GPS **NMEA 0183** (RMC + GGA) via UART 9600
-- **Notification auto** à l'acquisition d'un fix (vibration + LED verte)
-- Écran **Statut GPS** dédié : fix, lat/lon, altitude, HDOP, satellites, âge du fix
-- **Mode Rapide (waypoints)** :
-  - Sous-menu de **23 presets OSM** par défaut, classés par catégorie (mobilier, voirie, commerces, urgence…)
-  - Presets **remplaçables sans recompiler** : copier un `presets.txt` sur la SD
-  - **Variantes par preset** (ex. Café / Pub / Bar / Fast food) cyclables avec `←`/`→`
-  - **Éditeur de note** courte via `Up` (Flipper TextInput), `Down` pour l'effacer
-  - Écran live : coordonnées, altitude, HDOP, satellites, âge du fix, compteur session + total cumulatif
-  - **`OK` court** : sauvegarde si `fix OK` et `HDOP ≤ 2.5`, sinon son d'erreur
-  - **`OK` long** : force la sauvegarde quel que soit le fix
-- **Mode Trace (auto-log GPX)** :
-  - `<trkpt>` écrit toutes les 5 s quand la vue est active et qu'un fix est dispo
-  - Chaque session démarre un nouveau `<trkseg>` (pas de ligne fictive entre deux sessions)
-  - Idéal pour mapper une rue/route en marchant ou à vélo
-- Sauvegarde dans `/ext/apps_data/osm_logger/` en **5 formats natifs** (tous valides à tout moment) :
-  - `points.jsonl` — 1 ligne JSON / point
-  - `notes.csv` — tableur
-  - `points.gpx` — GPX 1.1 avec waypoints, import direct JOSM/iD
-  - `points.geojson` — FeatureCollection, import direct QGIS/geojson.io
-  - `track.gpx` — GPX track en `<trkseg>`, import dans tout viewer GPX
-- Compatible Flipper **firmware stock** et **Momentum** (gère automatiquement le conflit UART avec le service Expansion)
+![osm_logger icon](osm_logger.png)
 
 ---
 
-## 🚀 Quickstart
+## ✨ Features
 
-**1. Installer `ufbt`** (outil officiel pour compiler les apps externes Flipper) :
+- **NMEA 0183** GPS reader (RMC + GGA) over UART 9600
+- Auto-notification (vibration + green LED) when GPS fix is acquired
+- **GPS Status** screen: fix, lat/lon, altitude, HDOP, satellites, fix age, live NMEA RX counters
+- **Quick Log (waypoints)** mode:
+  - Submenu of **23 OSM presets** by default, grouped by category (street furniture, roads, shops, emergency…)
+  - **SD-loadable presets**: drop a `presets.txt` on the SD to replace the built-in list without recompiling
+  - **Preset variants** (e.g. Cafe / Pub / Bar / Fast food) cycled with `←` / `→`
+  - **Short note editor** via `Up` (Flipper TextInput), `Down` to clear
+  - Live screen: coords, altitude, HDOP, sats, fix age, session + cumulative counters
+  - **Short `OK`**: save if `fix OK` and `HDOP ≤ 2.5`, error tone otherwise
+  - **Long `OK`**: force save regardless of fix quality
+- **Track mode (auto GPX log)**:
+  - Writes a `<trkpt>` every 5 s while the view is active and a fix is available
+  - Each session starts a new `<trkseg>` (no bogus line between separate sessions)
+  - Ideal for mapping a street or path on foot or bike
+- Saves to `/ext/apps_data/osm_logger/` in **5 native formats** (all valid at all times):
+  - `points.jsonl` — one JSON line per point
+  - `notes.csv` — spreadsheet-friendly
+  - `points.gpx` — GPX 1.1 waypoints, direct import into JOSM / iD
+  - `points.geojson` — FeatureCollection, direct import into QGIS / geojson.io
+  - `track.gpx` — GPX `<trkseg>` track, import into any GPX viewer
+- Works on **stock and Momentum firmware** (the app auto-disables the Expansion service to free the UART)
+
+---
+
+## 🧩 Hardware
+
+- **Flipper Zero** (with microSD)
+- **NEO-6M V2 GPS** (u-blox NEO-6) — NMEA output at 9600 bauds
+- Ceramic antenna (bundled) or external active antenna
+
+### Wiring (3.3 V only)
+
+| NEO-6M | Flipper pin   |
+|--------|---------------|
+| VCC    | 9 (3V3)       |
+| GND    | 11            |
+| TX     | **14** (RX)   |
+
+**⚠️ Use 3.3 V — never 5 V.** See [docs/HARDWARE.md](docs/HARDWARE.md) for details, first-fix tips and troubleshooting.
+
+---
+
+## 🔧 Build & install
+
+This app uses **`ufbt`** (micro Flipper Build Tool) — the official tool for external apps. Python 3.8+ required.
 
 ```bash
+# 1. Install ufbt
 python3 -m pip install --upgrade ufbt    # macOS / Linux
 py -m pip install --upgrade ufbt         # Windows
-```
 
-**2. Cloner et compiler :**
-
-```bash
+# 2. Clone and build
 git clone https://github.com/simongrossi/flipperzero-osm-logger-gps
 cd flipperzero-osm-logger-gps
-ufbt                   # produit ./dist/osm_logger.fap
+ufbt                    # produces ./dist/osm_logger.fap
+
+# 3. Deploy (Flipper plugged via USB, qFlipper closed)
+ufbt launch             # uploads + starts the app
 ```
 
-**3. Flasher + lancer sur le Flipper** (USB branché, qFlipper fermé) :
+> 💡 If `ufbt: command not found`, add `$HOME/Library/Python/3.9/bin` (macOS) or the equivalent to your `PATH`.
 
-```bash
-ufbt launch
-```
-
-> 💡 Si `ufbt: command not found`, ajouter `$HOME/Library/Python/3.9/bin` (macOS) ou l'équivalent à ton `$PATH`.
-
-**4. Câblage GPS** — voir [docs/HARDWARE.md](docs/HARDWARE.md). En résumé :
-
-| NEO-6M | Flipper      |
-|--------|--------------|
-| VCC    | pin 9 (3V3)  |
-| GND    | pin 11       |
-| TX     | pin 14 (RX)  |
-
-**⚠️ 3,3 V uniquement, pas 5 V.**
+Alternatively, drop `dist/osm_logger.fap` into `/ext/apps/GPIO/` via qFlipper.
 
 ---
 
-## ▶️ Utilisation
+## ▶️ Usage
 
-1. Lancer **OSM Logger** sur le Flipper.
-2. Menu principal → `Mode rapide (Quick Log)`.
-3. Choisir un preset dans la liste (Banc, Poubelle, Pharmacie…).
-4. Écran **Quick Log** — attendre un fix (`fix=Xs` indique l'âge du dernier fix).
+1. Launch **OSM Logger** from the Apps menu.
+2. Main menu → `Quick Log (waypoints)`.
+3. Pick a preset (Bench, Pharmacy, Defibrillator, …).
+4. **Quick Log screen** — wait for a fix (`fix=Xs` shows the age of the last fix).
 
-| Touche      | Action                                                       |
+| Key         | Action                                                       |
 |-------------|--------------------------------------------------------------|
-| `OK` court  | Enregistrer si fix OK et HDOP ≤ 2.5 (sinon son d'erreur)     |
-| `OK` long   | Forcer l'enregistrement même sans fix ou avec HDOP dégradé   |
-| `←` / `→`   | Changer de variante (si le preset a plusieurs valeurs)       |
-| `Up`        | Ouvrir l'éditeur de note (TextInput Flipper)                 |
-| `Down`      | Effacer la note courante                                     |
-| `Back`      | Retour à la liste des presets                                |
+| `OK` short  | Save if `fix OK` and `HDOP ≤ 2.5` (error tone otherwise)     |
+| `OK` long   | Force save despite missing fix or high HDOP                  |
+| `←` / `→`   | Cycle through variants (if the preset has multiple values)   |
+| `Up`        | Open the note editor (Flipper TextInput)                     |
+| `Down`      | Clear the current note                                       |
+| `Back`      | Back to the preset list                                      |
 
-5. En fin de session, récupérer les fichiers via qFlipper ou mode storage USB :
+5. At the end of a session, grab the files via qFlipper (File Manager) or USB mass storage:
    - `/ext/apps_data/osm_logger/points.jsonl`
    - `/ext/apps_data/osm_logger/notes.csv`
    - `/ext/apps_data/osm_logger/points.gpx`
    - `/ext/apps_data/osm_logger/points.geojson`
+   - `/ext/apps_data/osm_logger/track.gpx`
 
-Le menu principal propose aussi `Statut GPS` qui déclenche un log système + vibration/LED selon la qualité du fix.
+The main menu also has `GPS status` (dedicated diagnostic view) and `About`.
 
-### Anatomie de l'écran Quick Log
+### Quick Log screen at a glance
 
 ```
-     < Cafe 2/4 >          <- preset + variante courante si >1
-     amenity=pub           <- tag OSM effectif (dépend de la variante)
-    48.43123, -0.09321     <- coords live (lat, lon)
-    HDOP=1.3 sats=9  #12   <- qualité + compteur session
-    alt=45m fix=3s  t=247  <- altitude, âge du fix, total cumulatif
-  OK save  Up:note  <>:variant   <- rappel touches (ou "note: ..." si renseignée)
+     < Cafe 2/4 >           <- preset + current variant (if >1)
+     amenity=pub            <- effective OSM tag
+    48.43123, -0.09321      <- live coords
+    HDOP=1.3 sats=9  #12    <- fix quality + session counter
+    alt=45m fix=3s  t=247   <- altitude, fix age, total in file
+  OK save  Up:note  <>:var  <- key hints (or "note: ..." when set)
 ```
 
 ---
+
+## 📷 Screenshots
+
+| Main menu | Preset picker | Quick Log |
+|-----------|---------------|-----------|
+| ![main menu](screenshots/01-menu.png) | ![preset picker](screenshots/02-presets.png) | ![quick log](screenshots/03-quicklog.png) |
+
+| Track mode | GPS status |
+|------------|------------|
+| ![track mode](screenshots/04-track.png) | ![gps status](screenshots/05-status.png) |
 
 ## 📚 Documentation
 
-- **[docs/HARDWARE.md](docs/HARDWARE.md)** — modules GPS supportés, câblage détaillé, premier fix, diagnostic "pas de données NMEA"
-- **[docs/FORMATS.md](docs/FORMATS.md)** — specs des fichiers JSONL/CSV/GPX/GeoJSON/track, champ par champ
-- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — structure du code, ajouter un preset, ajouter une vue, debug, pièges connus
-- **[docs/ROADMAP.md](docs/ROADMAP.md)** — features pas encore implémentées (avec pistes d'implémentation)
-- **[src/presets.c](src/presets.c)** — liste des 23 presets par défaut (éditable en recompilant, ou override via `presets.txt` sur la SD)
+- **[docs/HARDWARE.md](docs/HARDWARE.md)** — supported GPS modules, wiring, first fix, troubleshooting
+- **[docs/FORMATS.md](docs/FORMATS.md)** — detailed spec of the 5 output formats, field by field
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — code structure, adding a preset, adding a view, debugging, known pitfalls
+- **[docs/ROADMAP.md](docs/ROADMAP.md)** — planned features (not yet implemented) with implementation hints
+- **[src/presets.c](src/presets.c)** — the 23 default presets (editable by rebuilding, or override via `presets.txt` on SD)
+- **[presets.txt.sample](presets.txt.sample)** — sample presets file (in French, shows the syntax)
 
 ---
 
-## 🗺️ Workflow OSM
+## 🗺️ OSM workflow
 
-- **JOSM / iD** : importer `points.gpx` directement (waypoints nommés avec le tag OSM).
-- **QGIS / geojson.io** : importer `points.geojson` directement.
-- **Notes OSM** : `notes.csv` fournit une base texte à poster manuellement.
-- **Alternative** : `python3 scripts/jsonl_to_geojson.py points.jsonl > points.geojson` si tu préfères repartir du JSONL (conserve note + fix age).
+- **JOSM / iD**: import `points.gpx` directly (waypoints named with their OSM tag).
+- **QGIS / geojson.io**: import `points.geojson` directly.
+- **OSM Notes**: `notes.csv` is a text base you can post manually.
+- **GPX track**: import `track.gpx` into JOSM, GPX Viewer or Gaia GPS to visualise your route.
+- **Alternative**: `python3 scripts/jsonl_to_geojson.py points.jsonl > points.geojson` if you prefer to start from JSONL.
 
 ---
 
 ## 🚧 Roadmap
 
-Pour la liste détaillée des features pas encore implémentées avec pistes d'implémentation, voir **[docs/ROADMAP.md](docs/ROADMAP.md)**.
+See **[docs/ROADMAP.md](docs/ROADMAP.md)** for the full list of planned features with implementation hints.
 
-Résumé des gros morceaux restants :
-- Icône custom dans le launcher
-- Intervalle de trace configurable (5 s aujourd'hui)
-- Variantes = tags additionnels (aujourd'hui seulement valeurs alternatives)
-- Sous-catégories dans le menu de presets
-- Note persistante entre sessions
-- Support d'autres modules GPS (PA1010D, BN-180, etc.)
+Short summary:
+- Custom launcher icon
+- Configurable track interval (fixed at 5 s today)
+- Preset variants as additional tags (not just alternative values)
+- Sub-categories in the preset menu
+- Persistent notes across sessions
+- Support for other GPS modules (PA1010D, BN-180, etc.)
 
 ---
 
-## 🖊️ Licence
+## 🖊️ License
 
-MIT — voir [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

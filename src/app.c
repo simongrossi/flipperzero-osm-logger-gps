@@ -167,11 +167,11 @@ int32_t app(void* p) {
     // Menu principal
     app->menu = submenu_alloc();
     submenu_add_item(
-        app->menu, "Mode rapide (Quick Log)", MenuItemQuickLog, app_menu_callback, app);
+        app->menu, "Quick Log (waypoints)", MenuItemQuickLog, app_menu_callback, app);
     submenu_add_item(
-        app->menu, "Mode trace (track GPX)", MenuItemTrack, app_menu_callback, app);
+        app->menu, "Track mode (auto GPX)", MenuItemTrack, app_menu_callback, app);
     submenu_add_item(
-        app->menu, "Statut GPS", MenuItemStatus, app_menu_callback, app);
+        app->menu, "GPS status", MenuItemStatus, app_menu_callback, app);
     submenu_add_item(
         app->menu, "About", MenuItemAbout, app_menu_callback, app);
     View* menu_view = submenu_get_view(app->menu);
@@ -179,7 +179,7 @@ int32_t app(void* p) {
 
     // Sous-menu des presets OSM
     app->preset_menu = submenu_alloc();
-    submenu_set_header(app->preset_menu, "Type de POI");
+    submenu_set_header(app->preset_menu, "Pick a POI type");
     for(uint8_t i = 0; i < presets_count(); i++) {
         submenu_add_item(
             app->preset_menu, presets_get(i)->label, i, preset_menu_callback, app);
@@ -190,7 +190,7 @@ int32_t app(void* p) {
 
     // Éditeur de note (TextInput partagé, alloué une seule fois)
     app->note_input = text_input_alloc();
-    text_input_set_header_text(app->note_input, "Note courte (OK=valider)");
+    text_input_set_header_text(app->note_input, "Short note (OK to save)");
     text_input_set_result_callback(
         app->note_input,
         note_input_callback,

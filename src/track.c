@@ -92,6 +92,7 @@ static void track_draw_callback(Canvas* canvas, void* ctx) {
         snprintf(line1, sizeof(line1), "Waiting for fix...");
         snprintf(line2, sizeof(line2), "sats=%u", m->sats);
     }
+    // fall-through: Idle et REC déjà en anglais
     elements_multiline_text_aligned(canvas, 64, 18, AlignCenter, AlignTop, line1);
     elements_multiline_text_aligned(canvas, 64, 28, AlignCenter, AlignTop, line2);
 
@@ -106,7 +107,7 @@ static void track_draw_callback(Canvas* canvas, void* ctx) {
     elements_multiline_text_aligned(canvas, 64, 42, AlignCenter, AlignTop, line3);
 
     elements_multiline_text_aligned(
-        canvas, 64, 62, AlignCenter, AlignBottom, "Auto-log 5s  Back: stop");
+        canvas, 64, 62, AlignCenter, AlignBottom, "Auto-log 5s  Back to stop");
 }
 
 static bool track_input_callback(InputEvent* event, void* ctx) {
