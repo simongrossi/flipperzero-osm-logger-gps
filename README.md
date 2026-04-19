@@ -14,7 +14,8 @@
 - Auto-notification (vibration + green LED) when GPS fix is acquired
 - **Battery badge** displayed on every live screen
 - **GPS Status** screen: fix, lat/lon, altitude, HDOP, satellites, fix age, live NMEA RX counters
-- **Settings menu** with persisted prefs on SD: baud rate, track interval, track min distance filter, track HDOP strict toggle, preview-before-save toggle, auto photo ID, duplicate detection threshold, averaging duration
+- **Settings menu** with persisted prefs on SD: baud rate, track interval, track min distance filter, track HDOP strict toggle, preview-before-save toggle, auto photo ID, duplicate detection threshold, averaging duration, HDOP max gate, **survey mode**
+- **Survey mode** — toggle in Settings that auto-appends the canonical OSM tags `source=survey` + `survey:date=YYYY-MM-DD` to every save. These are the OSM community norm to signal "verified on site", appreciated by reviewers.
 - **Averaging mode**: collect N seconds of GPS samples (5 / 10 / 30 / 60 s) and save one point with the averaged coordinates and best HDOP observed. Reduces consumer-GPS noise to OSM-grade precision. `OK long` still gives an instant force save.
 - **Duplicate detection**: when saving, if a point with the same tag exists within X meters, a confirmation screen appears ("Same tag Ym away — OK=save anyway, Back=cancel"). Threshold configurable (off / 5 / 10 / 25 m).
 - **Clear save-error screens** when the SD is absent / full / unwritable.

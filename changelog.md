@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.14 — 2026-04-19
+
+### Added
+- **Survey mode** — toggle dans Settings (`Survey mode: on/off`, défaut off). Quand activé, chaque save ajoute automatiquement les deux tags OSM canoniques : `source=survey` et `survey:date=YYYY-MM-DD` (date courante du Flipper). C'est la norme community pour signaler "POI vérifié sur place par le contributeur" — très apprécié au moment du review des edits OSM. Les tags sont ajoutés après le tag principal (et les variantes éventuelles) via le séparateur `;`, donc traversent proprement les 6 formats de sortie (JSONL/CSV string, GPX `<desc>`, GeoJSON `properties.tag`, et éclatés en `<tag/>` séparés dans l'OSM XML).
+- Nouvelle clé `survey_mode=0|1` dans `settings.txt`.
+
+### Changed
+- `quick_log_write_point` : tag buffer passe de 64 à 128 octets pour accommoder la paire `source=survey;survey:date=...` (+36 chars fixes) en plus des tags preset + variantes.
+- `storage.c` (OSM XML writer) : `tag_copy` buffer passe de 96 à 160 octets pour parser les tags enrichis sans troncation.
+
+### Note pour les utilisateurs existants
+Le setting est off par défaut → aucun changement de comportement. Pour l'activer : Settings → Survey mode → on. Recommandé dès qu'on est en condition de vérification terrain (plutôt que de mapping "from memory" ou d'import).
+
 ## 0.13 (tooling) — 2026-04-19
 
 ### Added

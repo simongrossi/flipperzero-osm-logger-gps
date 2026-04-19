@@ -37,6 +37,7 @@ typedef struct {
     uint8_t duplicate_check_m; // 0 = désactivé
     uint8_t avg_seconds;       // 0 = instantané, sinon moyenne sur N secondes
     uint8_t hdop_max_x10;      // 0 = gate désactivé, sinon HDOP max × 10 (ex. 50 = 5.0)
+    bool survey_mode;          // ajoute source=survey + survey:date=YYYY-MM-DD à chaque save
 } Settings;
 
 void settings_defaults(Settings* s);

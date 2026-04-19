@@ -295,7 +295,7 @@ void storage_write_all_formats(
 
         // Parse tag_s "k1=v1;k2=v2;..." et émet un <tag k v/> par paire
         if(tag_s && tag_s[0]) {
-            char tag_copy[96];
+            char tag_copy[160];
             strncpy(tag_copy, tag_s, sizeof(tag_copy) - 1);
             tag_copy[sizeof(tag_copy) - 1] = '\0';
             char* token = tag_copy;

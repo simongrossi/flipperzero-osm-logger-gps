@@ -13,8 +13,8 @@ Ce fichier liste tout ce qui reste à faire dans l'app, groupé par thème et pr
 
 ## 🗺️ Features OSM-spécifiques
 
-### Survey mode
-Toggle dans Settings qui ajoute automatiquement `source=survey` et `survey:date=YYYY-MM-DD` au tag de chaque save. Ces deux tags sont la norme OSM pour signaler "vérifié sur place". Très apprécié par la community au moment du review des contributions.
+### ~~Survey mode~~ ✅ v0.14
+Toggle `Survey mode` dans Settings (off par défaut). Quand on, ajoute automatiquement `source=survey;survey:date=YYYY-MM-DD` au tag de chaque save. Les deux tags sont propagés dans les 6 formats de sortie (éclatés en `<tag/>` dans l'OSM XML).
 
 ### POI confidence rating
 Avant chaque save, permettre à l'utilisateur de noter la qualité de son observation (1-5 étoiles) via ←/→ sur un petit écran dédié. Sauvegardé dans `flipper:confidence=N` (tag custom, removable avant upload). Permet de filtrer les points douteux au post-traitement.

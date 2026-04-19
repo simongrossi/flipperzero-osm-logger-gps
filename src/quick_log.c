@@ -301,8 +301,23 @@ static bool quick_log_write_point(
     }
     FURI_LOG_D("OSM", "write_point: storage_write_all_formats");
 
-    char tag[64];
+    char tag[128];
     preset_build_tag(p, app->current_variant, tag, sizeof(tag));
+
+    // Survey mode : append les tags OSM standards "source=survey" + "survey:date=YYYY-MM-DD"
+    // qui signalent à la community que la contribution a été vérifiée sur place.
+    // Séparés par ';' → storage.c les éclate en <tag/> distincts dans l'OSM XML.
+    if(app->settings.survey_mode) {
+        DateTime dt_s;
+        furi_hal_rtc_get_datetime(&dt_s);
+        size_t tlen = strlen(tag);
+        snprintf(
+            tag + tlen,
+            sizeof(tag) - tlen,
+            "%ssource=survey;survey:date=%04u-%02u-%02u",
+            tlen > 0 ? ";" : "",
+            dt_s.year, dt_s.month, dt_s.day);
+    }
 
     // Note finale (base + auto_photo_id + suffixe avg éventuel)
     char final_note[160];

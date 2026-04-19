@@ -44,6 +44,7 @@ void settings_defaults(Settings* s) {
     s->duplicate_check_m = 10; // ON par défaut, seuil 10m (OSM-friendly)
     s->avg_seconds = 0;        // instantané par défaut (compat avec v0.9)
     s->hdop_max_x10 = 50;      // HDOP <= 5.0 par défaut (permissif, NEO-6M consumer)
+    s->survey_mode = false;    // off par défaut (opt-in : norme OSM quand on vérifie sur place)
 }
 
 uint8_t baud_rate_to_idx(uint32_t baud) {
@@ -185,6 +186,8 @@ static void parse_settings_buffer(char* buf, size_t size, Settings* s) {
                     break;
                 }
             }
+        } else if(key_len == 11 && !strncmp(&buf[key_start], "survey_mode", 11)) {
+            s->survey_mode = parse_uint(&buf[val_start], val_len) != 0;
         }
     }
 }
@@ -225,7 +228,7 @@ void settings_save(const Settings* s) {
 
     File* f = storage_file_alloc(st);
     if(f && storage_file_open(f, SETTINGS_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
-        char buf[448];
+        char buf[512];
         int n = snprintf(
             buf,
             sizeof(buf),
@@ -238,7 +241,8 @@ void settings_save(const Settings* s) {
             "auto_photo_id=%u\n"
             "duplicate_check_m=%u\n"
             "avg_seconds=%u\n"
-            "hdop_max_x10=%u\n",
+            "hdop_max_x10=%u\n"
+            "survey_mode=%u\n",
             (unsigned long)s->baud_rate,
             (unsigned)s->track_interval_s,
             (unsigned)s->track_min_dist_m,
@@ -247,7 +251,8 @@ void settings_save(const Settings* s) {
             s->auto_photo_id ? 1u : 0u,
             (unsigned)s->duplicate_check_m,
             (unsigned)s->avg_seconds,
-            (unsigned)s->hdop_max_x10);
+            (unsigned)s->hdop_max_x10,
+            s->survey_mode ? 1u : 0u);
         if(n > 0) storage_file_write(f, buf, (size_t)n);
         storage_file_close(f);
     }
@@ -373,6 +378,18 @@ static void settings_hdop_max_changed(VariableItem* item) {
     }
 }
 
+static void settings_survey_mode_changed(VariableItem* item) {
+    App* app = variable_item_get_context(item);
+    uint8_t idx = variable_item_get_current_value_index(item);
+    bool new_val = (idx != 0);
+    variable_item_set_current_value_text(item, ON_OFF[new_val ? 1 : 0]);
+
+    if(new_val != app->settings.survey_mode) {
+        app->settings.survey_mode = new_val;
+        settings_save(&app->settings);
+    }
+}
+
 static uint32_t settings_previous_callback(void* ctx) {
     (void)ctx;
     return AppViewMenu;
@@ -469,6 +486,16 @@ void app_start_settings(App* app) {
         uint8_t hdop_idx = hdop_max_to_idx(app->settings.hdop_max_x10);
         variable_item_set_current_value_index(item, hdop_idx);
         variable_item_set_current_value_text(item, HDOP_MAX_LABELS[hdop_idx]);
+
+        item = variable_item_list_add(
+            app->settings_list,
+            "Survey mode",
+            2,
+            settings_survey_mode_changed,
+            app);
+        variable_item_set_current_value_index(item, app->settings.survey_mode ? 1 : 0);
+        variable_item_set_current_value_text(
+            item, ON_OFF[app->settings.survey_mode ? 1 : 0]);
 
         app->settings_view = variable_item_list_get_view(app->settings_list);
         view_set_previous_callback(app->settings_view, settings_previous_callback);
