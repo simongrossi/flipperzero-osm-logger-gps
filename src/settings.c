@@ -27,6 +27,9 @@ const char* const TRACK_MIN_DIST_LABELS[TRACK_MIN_DIST_COUNT] = {"off", "2m", "5
 const uint8_t DUPLICATE_CHECK_M[DUPLICATE_CHECK_COUNT] = {0, 5, 10, 25};
 const char* const DUPLICATE_CHECK_LABELS[DUPLICATE_CHECK_COUNT] = {"off", "5m", "10m", "25m"};
 
+const uint8_t AVG_SECONDS[AVG_SECONDS_COUNT] = {0, 5, 10, 30, 60};
+const char* const AVG_SECONDS_LABELS[AVG_SECONDS_COUNT] = {"off", "5s", "10s", "30s", "60s"};
+
 // --- Helpers
 void settings_defaults(Settings* s) {
     s->baud_rate = 9600;
@@ -36,6 +39,7 @@ void settings_defaults(Settings* s) {
     s->preview_before_save = false;
     s->auto_photo_id = false;
     s->duplicate_check_m = 10; // ON par défaut, seuil 10m (OSM-friendly)
+    s->avg_seconds = 0;        // instantané par défaut (compat avec v0.9)
 }
 
 uint8_t baud_rate_to_idx(uint32_t baud) {
@@ -64,6 +68,13 @@ uint8_t duplicate_check_to_idx(uint8_t meters) {
         if(DUPLICATE_CHECK_M[i] == meters) return i;
     }
     return 2; // 10m
+}
+
+uint8_t avg_seconds_to_idx(uint8_t seconds) {
+    for(uint8_t i = 0; i < AVG_SECONDS_COUNT; i++) {
+        if(AVG_SECONDS[i] == seconds) return i;
+    }
+    return 0;
 }
 
 static uint32_t parse_uint(const char* s, size_t len) {
@@ -147,6 +158,14 @@ static void parse_settings_buffer(char* buf, size_t size, Settings* s) {
                     break;
                 }
             }
+        } else if(key_len == 11 && !strncmp(&buf[key_start], "avg_seconds", 11)) {
+            uint32_t v = parse_uint(&buf[val_start], val_len);
+            for(uint8_t a = 0; a < AVG_SECONDS_COUNT; a++) {
+                if(AVG_SECONDS[a] == v) {
+                    s->avg_seconds = (uint8_t)v;
+                    break;
+                }
+            }
         }
     }
 }
@@ -198,14 +217,16 @@ void settings_save(const Settings* s) {
             "track_hdop_strict=%u\n"
             "preview_before_save=%u\n"
             "auto_photo_id=%u\n"
-            "duplicate_check_m=%u\n",
+            "duplicate_check_m=%u\n"
+            "avg_seconds=%u\n",
             (unsigned long)s->baud_rate,
             (unsigned)s->track_interval_s,
             (unsigned)s->track_min_dist_m,
             s->track_hdop_strict ? 1u : 0u,
             s->preview_before_save ? 1u : 0u,
             s->auto_photo_id ? 1u : 0u,
-            (unsigned)s->duplicate_check_m);
+            (unsigned)s->duplicate_check_m,
+            (unsigned)s->avg_seconds);
         if(n > 0) storage_file_write(f, buf, (size_t)n);
         storage_file_close(f);
     }
@@ -305,6 +326,19 @@ static void settings_duplicate_check_changed(VariableItem* item) {
     }
 }
 
+static void settings_avg_changed(VariableItem* item) {
+    App* app = variable_item_get_context(item);
+    uint8_t idx = variable_item_get_current_value_index(item);
+    if(idx >= AVG_SECONDS_COUNT) idx = 0;
+    uint8_t new_val = AVG_SECONDS[idx];
+    variable_item_set_current_value_text(item, AVG_SECONDS_LABELS[idx]);
+
+    if(new_val != app->settings.avg_seconds) {
+        app->settings.avg_seconds = new_val;
+        settings_save(&app->settings);
+    }
+}
+
 static uint32_t settings_previous_callback(void* ctx) {
     (void)ctx;
     return AppViewMenu;
@@ -381,6 +415,16 @@ void app_start_settings(App* app) {
         uint8_t dup_idx = duplicate_check_to_idx(app->settings.duplicate_check_m);
         variable_item_set_current_value_index(item, dup_idx);
         variable_item_set_current_value_text(item, DUPLICATE_CHECK_LABELS[dup_idx]);
+
+        item = variable_item_list_add(
+            app->settings_list,
+            "Averaging",
+            AVG_SECONDS_COUNT,
+            settings_avg_changed,
+            app);
+        uint8_t avg_idx = avg_seconds_to_idx(app->settings.avg_seconds);
+        variable_item_set_current_value_index(item, avg_idx);
+        variable_item_set_current_value_text(item, AVG_SECONDS_LABELS[avg_idx]);
 
         app->settings_view = variable_item_list_get_view(app->settings_list);
         view_set_previous_callback(app->settings_view, settings_previous_callback);

@@ -1,5 +1,6 @@
 #include <furi.h>
 #include <furi_hal_power.h>
+#include <furi_hal_rtc.h>
 #include <gui/canvas.h>
 #include <gui/view_dispatcher.h>
 #include <gui/view.h>
@@ -38,6 +39,18 @@ typedef struct {
     float duplicate_dist_m;
     char last_error[64];
     char note[64];
+    bool recent_save;
+    char last_saved_preset[24];
+    char last_saved_time[8];
+
+    // Averaging
+    bool averaging;
+    uint32_t avg_elapsed_s;
+    uint32_t avg_total_s;
+    uint32_t avg_samples;
+    float avg_min_hdop;
+    float avg_cur_lat;
+    float avg_cur_lon;
 } QuickLogModel;
 
 static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
@@ -47,6 +60,36 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     if(!p) return;
 
     canvas_clear(canvas);
+
+    // Overlay averaging : collecte active de samples GPS
+    if(m->averaging) {
+        canvas_set_font(canvas, FontPrimary);
+        elements_multiline_text_aligned(canvas, 64, 2, AlignCenter, AlignTop, "Averaging...");
+        canvas_set_font(canvas, FontSecondary);
+
+        char line[48];
+        snprintf(line, sizeof(line), "%lu / %lu s",
+                 (unsigned long)m->avg_elapsed_s, (unsigned long)m->avg_total_s);
+        elements_multiline_text_aligned(canvas, 64, 16, AlignCenter, AlignTop, line);
+
+        snprintf(line, sizeof(line), "%lu samples  HDOP=%.1f",
+                 (unsigned long)m->avg_samples, (double)m->avg_min_hdop);
+        elements_multiline_text_aligned(canvas, 64, 28, AlignCenter, AlignTop, line);
+
+        if(m->avg_samples > 0) {
+            snprintf(line, sizeof(line), "%.6f", (double)m->avg_cur_lat);
+            elements_multiline_text_aligned(canvas, 64, 40, AlignCenter, AlignTop, line);
+            snprintf(line, sizeof(line), "%.6f", (double)m->avg_cur_lon);
+            elements_multiline_text_aligned(canvas, 64, 48, AlignCenter, AlignTop, line);
+        } else {
+            elements_multiline_text_aligned(
+                canvas, 64, 44, AlignCenter, AlignTop, "(waiting for fix)");
+        }
+
+        elements_multiline_text_aligned(
+            canvas, 64, 62, AlignCenter, AlignBottom, "Back to cancel");
+        return;
+    }
 
     // Overlay erreur (SD absente/pleine) : prioritaire sur tout le reste
     if(m->last_error[0]) {
@@ -202,8 +245,14 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     }
     elements_multiline_text_aligned(canvas, 64, y_alt, AlignCenter, AlignTop, line3);
 
-    // Footer : si note non-vide l'afficher, sinon rappel touches
-    if(m->note[0]) {
+    // Footer : toast SAVED > note > rappel touches
+    if(m->recent_save && m->last_saved_preset[0]) {
+        char toast[80];
+        snprintf(
+            toast, sizeof(toast), "> saved %s @%s",
+            m->last_saved_preset, m->last_saved_time);
+        elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, toast);
+    } else if(m->note[0]) {
         char footer[80];
         snprintf(footer, sizeof(footer), "note: %s", m->note);
         elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, footer);
@@ -213,18 +262,13 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     }
 }
 
-static bool quick_log_do_save(App* app, bool force) {
-    const Preset* p = presets_get(app->current_preset);
-    if(!p) p = presets_get(0);
+// Fonction de save bas niveau : écrit un point avec les coords et HDOP fournis.
+// Utilisée à la fois pour les saves instantanés et pour le final d'un averaging.
+static bool quick_log_write_point(
+    App* app, float lat, float lon, float hdop, uint8_t sats, float altitude,
+    const Preset* p, bool forced_note_avg) {
     if(!p) return false;
 
-    bool quality_ok = app->has_fix && (app->hdop <= HDOP_MAX);
-    if(!quality_ok && !force) {
-        notification_message(app->notification, &sequence_error);
-        return false;
-    }
-
-    // Pré-check SD (carte, dossier, espace)
     if(!storage_pre_save_check(app->last_error, sizeof(app->last_error))) {
         notification_message(app->notification, &sequence_error);
         return false;
@@ -233,11 +277,80 @@ static bool quick_log_do_save(App* app, bool force) {
     char tag[64];
     preset_build_tag(p, app->current_variant, tag, sizeof(tag));
 
+    // Note finale (base + auto_photo_id + suffixe avg éventuel)
+    char final_note[160];
+    final_note[0] = '\0';
+    const char* base_note = app->quick_note[0] ? app->quick_note : NULL;
+
+    char photo_suffix[24] = "";
+    if(app->settings.auto_photo_id) {
+        snprintf(
+            photo_suffix, sizeof(photo_suffix), "photo:%lu",
+            (unsigned long)(app->total_count + 1));
+    }
+
+    // Assemble les morceaux avec espaces
+    int w = 0;
+    if(base_note) {
+        w += snprintf(final_note + w, sizeof(final_note) - w, "%s", base_note);
+    }
+    if(photo_suffix[0]) {
+        w += snprintf(
+            final_note + w, sizeof(final_note) - w, "%s%s", w > 0 ? " " : "", photo_suffix);
+    }
+    if(forced_note_avg) {
+        w += snprintf(
+            final_note + w, sizeof(final_note) - w, "%s%s",
+            w > 0 ? " " : "", "avg");
+    }
+    const char* note = final_note[0] ? final_note : NULL;
+
+    storage_write_all_formats(lat, lon, altitude, hdop, sats, tag, note);
+
+    // Cache de note (on persiste juste la note utilisateur, pas photo/avg)
+    char primary[48];
+    preset_build_primary_tag(p, primary, sizeof(primary));
+    notes_cache_save(primary, app->quick_note);
+
+    // Tracker du dernier point
+    app->last_saved_tick = furi_get_tick();
+    strncpy(app->last_saved_preset, p->label, sizeof(app->last_saved_preset) - 1);
+    app->last_saved_preset[sizeof(app->last_saved_preset) - 1] = '\0';
+    DateTime dt;
+    furi_hal_rtc_get_datetime(&dt);
+    snprintf(app->last_saved_time, sizeof(app->last_saved_time), "%02u:%02u", dt.hour, dt.minute);
+
+    app->session_count++;
+    app->total_count++;
+    notification_message(app->notification, &sequence_success);
+    return true;
+}
+
+static bool quick_log_do_save(App* app, bool force) {
+    const Preset* p = presets_get(app->current_preset);
+    if(!p) p = presets_get(0);
+    if(!p) return false;
+
+    bool quality_ok = app->has_fix && (app->hdop <= HDOP_MAX);
+    if(!quality_ok && !force) {
+        if(!app->has_fix) {
+            snprintf(app->last_error, sizeof(app->last_error),
+                     "No GPS fix\nHold OK to force");
+        } else {
+            snprintf(app->last_error, sizeof(app->last_error),
+                     "HDOP %.1f > 2.5\nHold OK to force", (double)app->hdop);
+        }
+        notification_message(app->notification, &sequence_error);
+        return false;
+    }
+
     // Détection de doublon (si setting activé et pas déjà confirmé par user)
     if(!force && app->settings.duplicate_check_m > 0) {
+        char tag_for_dup[64];
+        preset_build_tag(p, app->current_variant, tag_for_dup, sizeof(tag_for_dup));
         float dist = 0;
         if(storage_find_duplicate_nearby(
-               app->lat, app->lon, tag,
+               app->lat, app->lon, tag_for_dup,
                app->settings.duplicate_check_m, &dist)) {
             app->duplicate_warning = true;
             app->duplicate_dist_m = dist;
@@ -246,37 +359,60 @@ static bool quick_log_do_save(App* app, bool force) {
         }
     }
 
-    // Construit la note finale : note utilisateur, avec éventuellement "photo:N" append
-    char final_note[128];
-    final_note[0] = '\0';
-    if(app->settings.auto_photo_id) {
-        uint32_t photo_id = app->total_count + 1;
-        if(app->quick_note[0]) {
-            snprintf(
-                final_note, sizeof(final_note), "%s photo:%lu",
-                app->quick_note, (unsigned long)photo_id);
-        } else {
-            snprintf(final_note, sizeof(final_note), "photo:%lu", (unsigned long)photo_id);
-        }
-    } else if(app->quick_note[0]) {
-        strncpy(final_note, app->quick_note, sizeof(final_note) - 1);
-        final_note[sizeof(final_note) - 1] = '\0';
+    return quick_log_write_point(
+        app, app->lat, app->lon, app->hdop, app->sats, app->altitude, p, false);
+}
+
+// --- Averaging : démarrage / tick / finalisation ---
+static void averaging_start(App* app) {
+    uint8_t secs = app->settings.avg_seconds;
+    if(secs == 0) return;
+    app->averaging = true;
+    app->averaging_start_tick = furi_get_tick();
+    uint32_t freq = furi_kernel_get_tick_frequency();
+    if(freq == 0) freq = 1;
+    app->averaging_end_tick = app->averaging_start_tick + (uint32_t)secs * freq;
+    app->avg_lat_sum = 0.0;
+    app->avg_lon_sum = 0.0;
+    app->avg_sample_count = 0;
+    app->avg_min_hdop = 99.9f;
+    app->avg_last_sampled_fix_tick = 0;
+}
+
+static void averaging_cancel(App* app) {
+    app->averaging = false;
+    app->avg_sample_count = 0;
+}
+
+// Collecte un sample si un nouveau fix est arrivé depuis le dernier tick.
+static void averaging_tick(App* app) {
+    if(!app->averaging) return;
+    if(app->has_fix && app->last_fix_tick != app->avg_last_sampled_fix_tick) {
+        app->avg_lat_sum += (double)app->lat;
+        app->avg_lon_sum += (double)app->lon;
+        if(app->hdop < app->avg_min_hdop) app->avg_min_hdop = app->hdop;
+        app->avg_sample_count++;
+        app->avg_last_sampled_fix_tick = app->last_fix_tick;
     }
-    const char* note = final_note[0] ? final_note : NULL;
 
-    storage_write_all_formats(
-        app->lat, app->lon, app->altitude, app->hdop, app->sats, tag, note);
-
-    // Persiste la note utilisateur (pas le photo:N, qui est auto) dans le cache
-    // pour ce preset.
-    char primary[48];
-    preset_build_primary_tag(p, primary, sizeof(primary));
-    notes_cache_save(primary, app->quick_note);
-
-    app->session_count++;
-    app->total_count++;
-    notification_message(app->notification, &sequence_success);
-    return true;
+    if(furi_get_tick() >= app->averaging_end_tick) {
+        if(app->avg_sample_count > 0) {
+            float avg_lat = (float)(app->avg_lat_sum / (double)app->avg_sample_count);
+            float avg_lon = (float)(app->avg_lon_sum / (double)app->avg_sample_count);
+            const Preset* p = presets_get(app->current_preset);
+            if(!p) p = presets_get(0);
+            if(p) {
+                quick_log_write_point(
+                    app, avg_lat, avg_lon, app->avg_min_hdop, app->sats,
+                    app->altitude, p, true);
+            }
+        } else {
+            snprintf(app->last_error, sizeof(app->last_error),
+                     "Averaging: no fix\nduring capture");
+            notification_message(app->notification, &sequence_error);
+        }
+        app->averaging = false;
+    }
 }
 
 static bool quick_log_input_callback(InputEvent* event, void* ctx) {
@@ -290,6 +426,15 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
     if(app->last_error[0]) {
         if(event->type == InputTypeShort) {
             app->last_error[0] = '\0';
+            quick_log_refresh(app);
+        }
+        return true;
+    }
+
+    // Averaging en cours : Back annule, les autres touches sont bloquées
+    if(app->averaging) {
+        if(event->type == InputTypeShort && event->key == InputKeyBack) {
+            averaging_cancel(app);
             quick_log_refresh(app);
         }
         return true;
@@ -364,14 +509,26 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
     }
 
     if(ok_short || ok_long) {
-        // Si preview activé et OK court : aller en mode preview au lieu de sauver direct.
-        // OK long court-circuite toujours le preview (force save).
-        if(ok_short && app->settings.preview_before_save) {
+        // OK long : force save instantané, quelle que soit la config
+        if(ok_long) {
+            quick_log_do_save(app, true);
+            quick_log_refresh(app);
+            return true;
+        }
+        // OK court + averaging activé -> démarre la collecte
+        if(app->settings.avg_seconds > 0 && !app->averaging) {
+            averaging_start(app);
+            quick_log_refresh(app);
+            return true;
+        }
+        // OK court + preview activé -> écran de confirmation
+        if(app->settings.preview_before_save) {
             app->preview_pending = true;
             quick_log_refresh(app);
             return true;
         }
-        quick_log_do_save(app, ok_long);
+        // Sinon : save instantané
+        quick_log_do_save(app, false);
         quick_log_refresh(app);
         return true;
     }
@@ -404,6 +561,9 @@ static void quick_log_exit(void* ctx) {
 void quick_log_refresh(App* app) {
     if(!app->quick_view) return;
 
+    // Tick de collecte d'averaging (si actif). Peut terminer le save automatiquement.
+    averaging_tick(app);
+
     uint32_t age_s = 0;
     bool fix_ever = (app->last_fix_tick != 0);
     if(fix_ever) {
@@ -415,6 +575,15 @@ void quick_log_refresh(App* app) {
     // dans les 5 dernières secondes, même si la trame courante dit "no fix".
     // Évite le clignotement RMC(V) <-> GGA(q>0) à 2 Hz.
     bool display_has_fix = app->has_fix || (fix_ever && age_s < 5);
+
+    // Toast "SAVED": actif pendant 10s après le dernier save
+    bool recent_save = false;
+    if(app->last_saved_tick != 0) {
+        uint32_t freq = furi_kernel_get_tick_frequency();
+        if(freq == 0) freq = 1;
+        uint32_t save_age = (furi_get_tick() - app->last_saved_tick) / freq;
+        recent_save = (save_age < 10);
+    }
 
     with_view_model(
         app->quick_view,
@@ -441,6 +610,30 @@ void quick_log_refresh(App* app) {
             m->last_error[sizeof(m->last_error) - 1] = '\0';
             strncpy(m->note, app->quick_note, sizeof(m->note) - 1);
             m->note[sizeof(m->note) - 1] = '\0';
+            m->recent_save = recent_save;
+            strncpy(m->last_saved_preset, app->last_saved_preset,
+                    sizeof(m->last_saved_preset) - 1);
+            m->last_saved_preset[sizeof(m->last_saved_preset) - 1] = '\0';
+            strncpy(m->last_saved_time, app->last_saved_time,
+                    sizeof(m->last_saved_time) - 1);
+            m->last_saved_time[sizeof(m->last_saved_time) - 1] = '\0';
+
+            // Averaging — snapshot de l'état courant pour l'overlay
+            m->averaging = app->averaging;
+            m->avg_total_s = app->settings.avg_seconds;
+            m->avg_samples = app->avg_sample_count;
+            m->avg_min_hdop = app->avg_min_hdop;
+            if(app->averaging) {
+                uint32_t freq = furi_kernel_get_tick_frequency();
+                if(freq == 0) freq = 1;
+                m->avg_elapsed_s = (furi_get_tick() - app->averaging_start_tick) / freq;
+                if(app->avg_sample_count > 0) {
+                    m->avg_cur_lat =
+                        (float)(app->avg_lat_sum / (double)app->avg_sample_count);
+                    m->avg_cur_lon =
+                        (float)(app->avg_lon_sum / (double)app->avg_sample_count);
+                }
+            }
         },
         true);
 }

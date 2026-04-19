@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.9 — 2026-04-19
+
+Grosse itération qualité de vie pour l'utilisation terrain. Focus : stabiliser l'affichage GPS + donner du contexte au utilisateur + introduire le mode averaging pour des positions de niveau OSM.
+
+### Added
+- **Mode averaging** : collecte N secondes de samples GPS et sauvegarde un seul point avec la **moyenne des lat/lon** et le **meilleur HDOP observé**. Setting `Averaging` : off / 5s / 10s / 30s / 60s (défaut off). C'est LA technique utilisée par les mappeurs OSM sérieux pour réduire le bruit du GPS consumer (le NEO-6M a typiquement ±5 m d'erreur par sample, ramené à <2 m avec 30s de moyenne).
+  - **Écran dédié** pendant la collecte : progress (elapsed/total), samples accumulés, HDOP min, moyenne live des coords.
+  - **`OK court` = démarre l'averaging** si setting > 0, sinon save instantané.
+  - **`OK long` = force save instantané** (bypass averaging + HDOP gate + duplicate check).
+  - **`Back` pendant collecte = annule** sans sauver.
+  - Marqueur `avg` ajouté automatiquement au champ `note` des points moyennés.
+- **Toast de confirmation** après chaque save sur Quick Log : pendant 10 secondes, le footer affiche `> saved Bench @10:42` avec le preset sauvegardé et l'heure (HH:MM). Après 10s, retour au rappel des touches habituel.
+- **Ligne "last save"** persistante en bas de l'écran GPS Status : `last: Bench @10:42` (remplace "Back" qui n'était pas utile).
+- **Messages de refus de save explicites** : quand OK court est refusé, un overlay rouge sur Quick Log indique :
+  - `No GPS fix / Hold OK to force` si pas de fix
+  - `HDOP X.X > 2.5 / Hold OK to force` si HDOP trop haut
+  
+  Une touche efface l'overlay. Plus de mystère sur "pourquoi mon save n'a rien fait".
+
+### Fixed
+- **Clignotement de l'affichage GPS** entre "FIX OK" et "No GPS fix" à 1-2 Hz en condition de fix stable, causé par le flip-flop entre RMC status=V (void) et GGA quality>0 dans les trames consécutives. Corrigé par une **hystérésis de 5 secondes** sur l'affichage `has_fix` (Quick Log / Track / GPS Status). La logique d'écriture reste sur le `app->has_fix` brut pour préserver l'intégrité des gates (trkpts, notification fix acquis).
+- **Coordonnées qui repassaient à 0,0** entre deux trames valides : l'ISR initialisait `lat/lon/hdop/sats` à 0 en local avant de passer au parser. Si la trame en cours ne contenait pas de fix, le parser ne touchait pas ces variables et on écrivait 0 dans `app->lat`. Maintenant les locaux sont seedés depuis `app->*` → on garde la dernière valeur connue.
+
+### Changed
+- `settings.txt` ajoute `avg_seconds=N`.
+- Refactor interne : extraction du chemin d'écriture dans `quick_log_write_point(...)` pour éviter la duplication entre save instantané et save averaged.
+
 ## 0.8 — 2026-04-19
 
 ### Added

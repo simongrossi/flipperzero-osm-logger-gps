@@ -108,11 +108,17 @@ static void serial_rx_callback(FuriHalSerialHandle* handle, FuriHalSerialRxEvent
                     app->nmea_lines_rx++;
 
                     bool has_fix = false;
-                    float lat = 0, lon = 0, hdop = 99.9f, altitude = 0;
-                    // Garde la dernière valeur si la trame ne les fournit pas
+                    // Garde les dernières valeurs connues si la trame en cours
+                    // ne les fournit pas (cas courant : GGA sans fix → RMC avec
+                    // fix → GGA sans fix → ...). Sans cette init, on recevait
+                    // lat=lon=0 à chaque trame sans fix.
+                    float lat = app->lat;
+                    float lon = app->lon;
+                    float hdop = app->hdop;
+                    float altitude = app->altitude;
                     float heading = app->heading_deg;
                     float speed_kts = app->speed_knots;
-                    uint8_t sats = 0;
+                    uint8_t sats = app->sats;
 
                     nmea_parse_line(
                         app->nmea_line, &has_fix, &lat, &lon, &hdop, &sats, &altitude,

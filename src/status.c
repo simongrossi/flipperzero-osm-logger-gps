@@ -21,6 +21,8 @@ typedef struct {
     bool fix_ever;
     uint32_t nmea_bytes_rx;
     uint32_t nmea_lines_rx;
+    char last_saved_preset[24];
+    char last_saved_time[8];
 } StatusModel;
 
 static void status_draw_callback(Canvas* canvas, void* ctx) {
@@ -80,7 +82,15 @@ static void status_draw_callback(Canvas* canvas, void* ctx) {
     elements_multiline_text_aligned(canvas, 64, 38, AlignCenter, AlignTop, line3);
     elements_multiline_text_aligned(canvas, 64, 48, AlignCenter, AlignTop, line4);
 
-    elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, "Back");
+    // Footer : last save si présent, sinon juste "Back"
+    if(m->last_saved_preset[0]) {
+        char footer[48];
+        snprintf(footer, sizeof(footer), "last: %s @%s",
+                 m->last_saved_preset, m->last_saved_time);
+        elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, footer);
+    } else {
+        elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, "Back");
+    }
 }
 
 static bool status_input_callback(InputEvent* event, void* ctx) {
@@ -128,6 +138,12 @@ void status_refresh(App* app) {
             m->fix_ever = fix_ever;
             m->nmea_bytes_rx = app->nmea_bytes_rx;
             m->nmea_lines_rx = app->nmea_lines_rx;
+            strncpy(m->last_saved_preset, app->last_saved_preset,
+                    sizeof(m->last_saved_preset) - 1);
+            m->last_saved_preset[sizeof(m->last_saved_preset) - 1] = '\0';
+            strncpy(m->last_saved_time, app->last_saved_time,
+                    sizeof(m->last_saved_time) - 1);
+            m->last_saved_time[sizeof(m->last_saved_time) - 1] = '\0';
         },
         true);
 }

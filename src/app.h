@@ -105,6 +105,21 @@ typedef struct App {
     bool duplicate_warning;   // détecté un point proche avec le même tag
     float duplicate_dist_m;   // distance au point le plus proche
     char last_error[64];      // message d'erreur à afficher en overlay (ex. "Disk full")
+
+    // --- Dernier point sauvegardé (pour confirmation / contexte) ---
+    uint32_t last_saved_tick;   // 0 = jamais sauvé cette session
+    char last_saved_preset[24]; // label du preset (ex. "Bench")
+    char last_saved_time[8];    // "HH:MM" du RTC au moment du save
+
+    // --- Averaging mode (collecte de N secondes de samples GPS) ---
+    bool averaging;                // true pendant la collecte
+    uint32_t averaging_start_tick; // tick au démarrage
+    uint32_t averaging_end_tick;   // tick à atteindre pour finir
+    double avg_lat_sum;            // somme des samples (double pour la précision)
+    double avg_lon_sum;
+    uint32_t avg_sample_count;     // nombre de samples accumulés
+    float avg_min_hdop;            // meilleur HDOP observé pendant la collecte
+    uint32_t avg_last_sampled_fix_tick; // dernier fix tick déjà pris en sample
 } App;
 
 void app_reconfigure_uart(App* app);
