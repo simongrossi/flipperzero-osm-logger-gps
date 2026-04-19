@@ -1,5 +1,7 @@
 # flipperzero-osm-logger-gps
 
+[![FAP Build](https://github.com/simongrossi/flipperzero-osm-logger-gps/actions/workflows/fap-build.yml/badge.svg)](https://github.com/simongrossi/flipperzero-osm-logger-gps/actions/workflows/fap-build.yml)
+
 > Log **OSM POIs** in the field with a **Flipper Zero** + **NEO-6M GPS** :
 > pick a POI type (bench, bin, drinking water, defibrillator…), save lat/lon/alt/timestamp/OSM tag
 > to microSD in **6 native formats** (JSONL, CSV, GPX with OsmAnd extensions, GeoJSON, OSM XML, GPX track).
