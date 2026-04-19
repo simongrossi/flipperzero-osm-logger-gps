@@ -411,12 +411,16 @@ void quick_log_refresh(App* app) {
         if(freq == 0) freq = 1;
         age_s = (furi_get_tick() - app->last_fix_tick) / freq;
     }
+    // Hystérésis d'affichage : on reste en "fix OK" tant qu'on a eu un fix
+    // dans les 5 dernières secondes, même si la trame courante dit "no fix".
+    // Évite le clignotement RMC(V) <-> GGA(q>0) à 2 Hz.
+    bool display_has_fix = app->has_fix || (fix_ever && age_s < 5);
 
     with_view_model(
         app->quick_view,
         QuickLogModel * m,
         {
-            m->has_fix = app->has_fix;
+            m->has_fix = display_has_fix;
             m->lat = app->lat;
             m->lon = app->lon;
             m->hdop = app->hdop;

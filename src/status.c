@@ -111,12 +111,14 @@ void status_refresh(App* app) {
         if(freq == 0) freq = 1;
         age_s = (furi_get_tick() - app->last_fix_tick) / freq;
     }
+    // Hystérésis 5s (voir quick_log_refresh pour l'explication)
+    bool display_has_fix = app->has_fix || (fix_ever && age_s < 5);
 
     with_view_model(
         app->status_view,
         StatusModel * m,
         {
-            m->has_fix = app->has_fix;
+            m->has_fix = display_has_fix;
             m->lat = app->lat;
             m->lon = app->lon;
             m->altitude = app->altitude;

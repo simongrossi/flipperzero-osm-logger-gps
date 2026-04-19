@@ -54,12 +54,21 @@ void track_refresh(App* app) {
         if(freq == 0) freq = 1;
         duration = (furi_get_tick() - app->track_start_tick) / freq;
     }
+    // Hystérésis 5s pour l'affichage (la logique de write trkpt reste sur
+    // app->has_fix réel dans track_timer_callback).
+    bool display_has_fix = app->has_fix;
+    if(!display_has_fix && app->last_fix_tick != 0) {
+        uint32_t freq = furi_kernel_get_tick_frequency();
+        if(freq == 0) freq = 1;
+        uint32_t age = (furi_get_tick() - app->last_fix_tick) / freq;
+        if(age < 5) display_has_fix = true;
+    }
 
     with_view_model(
         app->track_view,
         TrackModel * m,
         {
-            m->has_fix = app->has_fix;
+            m->has_fix = display_has_fix;
             m->lat = app->lat;
             m->lon = app->lon;
             m->hdop = app->hdop;
