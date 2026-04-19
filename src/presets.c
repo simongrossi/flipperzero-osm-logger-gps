@@ -27,6 +27,27 @@ const char* const PRESET_CATEGORY_LABELS[PresetCatCount] = {
     "Other",
 };
 
+// Palette visuelle distincte par catégorie (standard OsmAnd Favorites).
+// Affiche dans OsmAnd une pastille colorée pour chaque point → navigation visuelle
+// rapide (on voit tout de suite "rouge = urgence", "vert = nature", etc.).
+const char* const PRESET_CATEGORY_COLORS[PresetCatCount] = {
+    "#10c0f0", // Street furniture — cyan
+    "#ff8800", // Roads & signs — orange
+    "#808080", // Parking — gray
+    "#00c000", // Sports & leisure — vivid green
+    "#8800ff", // Waste — purple
+    "#ffcc00", // Shops — yellow
+    "#0080ff", // Services — blue
+    "#ff0000", // Emergency — red
+    "#ff80c0", // Tourism — pink
+    "#008000", // Nature — dark green
+    "#6040a0", // Education — indigo
+    "#a08040", // Religion — brown
+    "#4040c0", // Transport — navy
+    "#ffffff", // Address — white
+    "#c0c0c0", // Other — silver
+};
+
 // --- Defaults compilés en dur ---
 static const Preset DEFAULT_PRESETS[] = {
     // =========================  Street furniture  ============================

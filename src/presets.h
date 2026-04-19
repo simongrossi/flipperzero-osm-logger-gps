@@ -25,6 +25,8 @@ typedef enum {
 } PresetCategory;
 
 extern const char* const PRESET_CATEGORY_LABELS[PresetCatCount];
+// Couleur hex (format "#RRGGBB") pour OsmAnd Favorites, par catégorie.
+extern const char* const PRESET_CATEGORY_COLORS[PresetCatCount];
 
 typedef struct {
     const char* label;

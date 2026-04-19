@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12 — 2026-04-19
+
+### Added
+- **`points.gpx` enrichi au format OsmAnd Favorites** — le fichier GPX ajoute désormais des extensions OsmAnd (`<osmand:icon>`, `<osmand:background>`, `<osmand:color>`) + un `<type>` catégorie + un `<name>` humain lisible (ex. `"Bench"`) + un `<desc>` technique avec le tag OSM brut. Importé dans OsmAnd : chaque point devient un favori avec pastille colorée par catégorie et icône dérivée du tag (ex. icône banc pour `amenity=bench`). 100% rétro-compatible : JOSM, iD, QGIS, GPX Viewer ignorent silencieusement le namespace `osmand:` qu'ils ne connaissent pas.
+- **Palette couleur par catégorie** : Street furniture = cyan, Emergency = rouge, Nature = vert foncé, Services = bleu, Tourism = rose, etc. (table complète `PRESET_CATEGORY_COLORS` dans `src/presets.c`). Navigation visuelle rapide dans OsmAnd.
+
+### Changed
+- **Format GPX : `<name>` devient humain lisible** au lieu du tag OSM technique. Ex. `<name>Bench</name>` au lieu de `<name>amenity=bench</name>`. Le tag complet reste accessible via `<desc>`. Breaking change mineur pour les scripts de post-traitement qui lisaient le tag depuis `<name>` — à migrer vers `<desc>`.
+- `storage_write_all_formats` prend 4 nouveaux paramètres : `display_name`, `category_label`, `osmand_icon`, `osmand_color`. Seul appelant : `quick_log_write_point`.
+
 ## 0.11 — 2026-04-19
 
 ### Added

@@ -3,6 +3,15 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+// Écrit un point dans les 4 fichiers (JSONL, CSV, GPX, GeoJSON).
+// Le GPX est enrichi avec des extensions OsmAnd (icon/color/background) +
+// type (catégorie) + nom humain lisible. Les autres formats n'utilisent que
+// les champs standard.
+//
+//   display_name   : label humain (ex. "Bench") pour <name>
+//   category_label : catégorie (ex. "Street furniture") pour <type>
+//   osmand_icon    : valeur primaire OSM (ex. "bench") — OsmAnd mappe l'icône
+//   osmand_color   : couleur hex "#RRGGBB" pour la pastille OsmAnd (peut être NULL)
 void storage_write_all_formats(
     float lat,
     float lon,
@@ -10,7 +19,11 @@ void storage_write_all_formats(
     float hdop,
     uint8_t sats,
     const char* tag,
-    const char* note);
+    const char* note,
+    const char* display_name,
+    const char* category_label,
+    const char* osmand_icon,
+    const char* osmand_color);
 
 // Compte le nombre de points déjà présents dans points.jsonl (0 si pas de fichier).
 uint32_t storage_count_saved_points(void);

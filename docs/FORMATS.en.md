@@ -39,21 +39,40 @@ Quotes around text fields for Excel/LibreOffice compatibility. `"` inside `note`
 
 > 💡 No header → if you open it in a spreadsheet, manually add a first row.
 
-## `points.gpx` — GPX 1.1 (waypoints)
+## `points.gpx` — GPX 1.1 (waypoints) with OsmAnd Favorites extensions
 
-Valid XML at all times (after every OK). Direct import into **JOSM**, **iD**, **QGIS**, **GPX Viewer**, etc.
+Valid XML at all times (after every OK). Enriched with the **OsmAnd Favorites** namespace (icon + color + category) for nice visual rendering in OsmAnd, while remaining 100% compatible with **JOSM**, **iD**, **QGIS**, **GPX Viewer** (which silently ignore unknown extensions).
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Flipper Zero OSM Logger" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="Flipper Zero OSM Logger"
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:osmand="https://osmand.net">
   <wpt lat="48.431234" lon="-0.093210">
     <ele>45.2</ele>
     <time>2026-04-19T08:45:12Z</time>
-    <name>amenity=bench</name>
-    <desc>HDOP=1.3 sats=9</desc>
+    <name>Bench</name>
+    <desc>amenity=bench  HDOP=1.3 sats=9</desc>
+    <type>Street furniture</type>
+    <extensions>
+      <osmand:icon>bench</osmand:icon>
+      <osmand:background>circle</osmand:background>
+      <osmand:color>#10c0f0</osmand:color>
+    </extensions>
   </wpt>
 </gpx>
 ```
+
+**Field mapping**:
+- `<name>`: **human-readable label** of the preset (e.g. `"Bench"`, `"Drinking water"`). Cleaner than the old format `amenity=bench`.
+- `<desc>`: **technical details** → the full OSM tag + HDOP + satellite count.
+- `<type>`: **category** (Street furniture, Roads & signs, Tourism, Emergency, …). OsmAnd uses this to group favorites into folders.
+- `<extensions>`: OsmAnd display directives:
+  - `icon` derived from the OSM primary value (e.g. `bench`, `atm`, `cafe`) — OsmAnd looks up a matching icon in its library, falling back to a generic one.
+  - `background` = `circle` (pill shape around the icon).
+  - `color` per category: e.g. red for Emergency, green for Nature, cyan for Street furniture.
+
+**Import into OsmAnd**: File > Import > this `.gpx` → each point becomes a favorite with its colored pill and icon.
 
 The app uses a *write-append-framed* strategy: on each save it opens the file in R/W, seeks just before `</gpx>`, truncates, writes the new `<wpt>` and rewrites the footer. So the file stays valid XML even after a power cut **between two saves**.
 

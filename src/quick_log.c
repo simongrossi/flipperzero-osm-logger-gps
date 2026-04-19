@@ -332,7 +332,18 @@ static bool quick_log_write_point(
     }
     const char* note = final_note[0] ? final_note : NULL;
 
-    storage_write_all_formats(lat, lon, altitude, hdop, sats, tag, note);
+    // Infos supplémentaires pour enrichir le GPX (format OsmAnd Favorites)
+    const char* cat_label =
+        (p->category < PresetCatCount) ? PRESET_CATEGORY_LABELS[p->category] : "Other";
+    const char* cat_color =
+        (p->category < PresetCatCount) ? PRESET_CATEGORY_COLORS[p->category] : "#c0c0c0";
+    // L'icône OsmAnd est dérivée de la valeur primaire OSM (ex. "bench" → icône banc).
+    // Si OsmAnd n'a pas l'icône, il utilise une icône générique.
+    const char* icon_hint = (p->variants[0] && p->variants[0][0]) ? p->variants[0] : "special_marker";
+
+    storage_write_all_formats(
+        lat, lon, altitude, hdop, sats, tag, note,
+        p->label, cat_label, icon_hint, cat_color);
     FURI_LOG_D("OSM", "write_point: formats written, saving note cache");
 
     // Cache de note (on persiste juste la note utilisateur, pas photo/avg)

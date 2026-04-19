@@ -83,10 +83,14 @@ static void write_append_framed(
     storage_file_free(f);
 }
 
+// GPX header avec namespace OsmAnd pour les extensions Favorites.
+// Les apps qui ne connaissent pas osmand (JOSM, iD, QGIS, ...) ignorent
+// silencieusement les extensions, c'est compatible standard GPX 1.1.
 static const char GPX_HEADER[] =
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
     "<gpx version=\"1.1\" creator=\"Flipper Zero OSM Logger\" "
-    "xmlns=\"http://www.topografix.com/GPX/1/1\">\n";
+    "xmlns=\"http://www.topografix.com/GPX/1/1\" "
+    "xmlns:osmand=\"https://osmand.net\">\n";
 static const char GPX_FOOTER[] = "</gpx>\n";
 
 static const char GEOJSON_HEADER[] = "{\"type\":\"FeatureCollection\",\"features\":[\n";
@@ -99,7 +103,11 @@ void storage_write_all_formats(
     float hdop,
     uint8_t sats,
     const char* tag,
-    const char* note) {
+    const char* note,
+    const char* display_name,
+    const char* category_label,
+    const char* osmand_icon,
+    const char* osmand_color) {
     Storage* s = furi_record_open(RECORD_STORAGE);
     if(!ensure_dir(s)) {
         furi_record_close(RECORD_STORAGE);
@@ -165,9 +173,18 @@ void storage_write_all_formats(
         FURI_LOG_D("OSM", "write: csv done");
     }
 
-    // GPX (waypoint)
+    // GPX (waypoint enrichi avec extensions OsmAnd Favorites)
+    // - <name>       : label humain lisible (ex. "Bench")
+    // - <desc>       : infos techniques (tag OSM + HDOP + sats)
+    // - <type>       : catégorie (ex. "Street furniture")
+    // - <extensions> : icon + couleur + forme pour OsmAnd Favorites
     {
-        char wpt[320];
+        const char* name = (display_name && display_name[0]) ? display_name : tag_s;
+        const char* cat = (category_label && category_label[0]) ? category_label : "Other";
+        const char* icon = (osmand_icon && osmand_icon[0]) ? osmand_icon : "special_marker";
+        const char* color = (osmand_color && osmand_color[0]) ? osmand_color : "#c0c0c0";
+
+        char wpt[512];
         snprintf(
             wpt,
             sizeof(wpt),
@@ -175,15 +192,25 @@ void storage_write_all_formats(
             "    <ele>%.1f</ele>\n"
             "    <time>%s</time>\n"
             "    <name>%s</name>\n"
-            "    <desc>HDOP=%.1f sats=%u</desc>\n"
+            "    <desc>%s  HDOP=%.1f sats=%u</desc>\n"
+            "    <type>%s</type>\n"
+            "    <extensions>\n"
+            "      <osmand:icon>%s</osmand:icon>\n"
+            "      <osmand:background>circle</osmand:background>\n"
+            "      <osmand:color>%s</osmand:color>\n"
+            "    </extensions>\n"
             "  </wpt>\n",
             (double)lat,
             (double)lon,
             (double)altitude,
             iso,
+            name,
             tag_s,
             (double)hdop,
-            (unsigned)sats);
+            (unsigned)sats,
+            cat,
+            icon,
+            color);
         FURI_LOG_D("OSM", "write: gpx start");
         write_append_framed(
             s,
