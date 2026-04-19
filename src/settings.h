@@ -22,6 +22,11 @@ extern const char* const DUPLICATE_CHECK_LABELS[DUPLICATE_CHECK_COUNT];
 extern const uint8_t AVG_SECONDS[AVG_SECONDS_COUNT];
 extern const char* const AVG_SECONDS_LABELS[AVG_SECONDS_COUNT];
 
+// HDOP max stocké en dixièmes (0 = désactivé, sinon 25 = 2.5, 30 = 3.0, ...)
+#define HDOP_MAX_COUNT 5
+extern const uint8_t HDOP_MAX_X10[HDOP_MAX_COUNT];
+extern const char* const HDOP_MAX_LABELS[HDOP_MAX_COUNT];
+
 typedef struct {
     uint32_t baud_rate;
     uint8_t track_interval_s;
@@ -31,6 +36,7 @@ typedef struct {
     bool auto_photo_id;
     uint8_t duplicate_check_m; // 0 = désactivé
     uint8_t avg_seconds;       // 0 = instantané, sinon moyenne sur N secondes
+    uint8_t hdop_max_x10;      // 0 = gate désactivé, sinon HDOP max × 10 (ex. 50 = 5.0)
 } Settings;
 
 void settings_defaults(Settings* s);
@@ -42,6 +48,7 @@ uint8_t track_interval_to_idx(uint8_t seconds);
 uint8_t track_min_dist_to_idx(uint8_t meters);
 uint8_t duplicate_check_to_idx(uint8_t meters);
 uint8_t avg_seconds_to_idx(uint8_t seconds);
+uint8_t hdop_max_to_idx(uint8_t hdop_x10);
 
 #ifdef __cplusplus
 extern "C" {

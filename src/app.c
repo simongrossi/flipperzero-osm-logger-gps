@@ -77,7 +77,6 @@ static void app_tick_callback(void* ctx) {
     App* app = (App*)ctx;
     if(app->pending_fix_notify) {
         app->pending_fix_notify = false;
-        // Cooldown 10 s : évite le spam si le fix flippe entre trames RMC et GGA
         uint32_t now = furi_get_tick();
         uint32_t freq = furi_kernel_get_tick_frequency();
         uint32_t cooldown_ticks = 10 * (freq ? freq : 1);
@@ -87,6 +86,10 @@ static void app_tick_callback(void* ctx) {
             FURI_LOG_I("OSM", "GPS fix acquired");
         }
     }
+    // Save différé : à faire ici (tick) et pas dans un input handler, pour que
+    // la frame précédente ait le temps d'afficher "Saving..." avant le blocage I/O.
+    quick_log_tick_deferred(app);
+
     quick_log_refresh(app);
     track_refresh(app);
     status_refresh(app);

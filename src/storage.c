@@ -134,7 +134,9 @@ void storage_write_all_formats(
             (unsigned)sats,
             tag_s,
             note ? note : "");
+        FURI_LOG_D("OSM", "write: jsonl start");
         append_line(s, "/ext/apps_data/osm_logger/points.jsonl", buf);
+        FURI_LOG_D("OSM", "write: jsonl done");
     }
 
     // CSV : time,lat,lon,alt,hdop,sats,tag,note
@@ -158,7 +160,9 @@ void storage_write_all_formats(
             (unsigned)sats,
             tag_s,
             note_copy);
+        FURI_LOG_D("OSM", "write: csv start");
         append_line(s, "/ext/apps_data/osm_logger/notes.csv", buf);
+        FURI_LOG_D("OSM", "write: csv done");
     }
 
     // GPX (waypoint)
@@ -180,6 +184,7 @@ void storage_write_all_formats(
             tag_s,
             (double)hdop,
             (unsigned)sats);
+        FURI_LOG_D("OSM", "write: gpx start");
         write_append_framed(
             s,
             "/ext/apps_data/osm_logger/points.gpx",
@@ -188,6 +193,7 @@ void storage_write_all_formats(
             NULL,
             GPX_FOOTER,
             sizeof(GPX_FOOTER) - 1);
+        FURI_LOG_D("OSM", "write: gpx done");
     }
 
     // GeoJSON (FeatureCollection)
@@ -207,6 +213,7 @@ void storage_write_all_formats(
             tag_s,
             (double)hdop,
             (unsigned)sats);
+        FURI_LOG_D("OSM", "write: geojson start");
         write_append_framed(
             s,
             "/ext/apps_data/osm_logger/points.geojson",
@@ -215,6 +222,7 @@ void storage_write_all_formats(
             ",\n", // séparateur entre Features si le fichier existait déjà
             GEOJSON_FOOTER,
             sizeof(GEOJSON_FOOTER) - 1);
+        FURI_LOG_D("OSM", "write: geojson done");
     }
 
     furi_record_close(RECORD_STORAGE);

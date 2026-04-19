@@ -91,8 +91,11 @@ static void track_timer_callback(void* ctx) {
     App* app = (App*)ctx;
     if(!app->has_fix) return;
 
-    // Si HDOP strict activé, refuser les fixes dégradés (> 2.5)
-    if(app->settings.track_hdop_strict && app->hdop > 2.5f) return;
+    // Si HDOP strict activé, refuser les fixes dégradés (seuil = settings.hdop_max_x10)
+    if(app->settings.track_hdop_strict && app->settings.hdop_max_x10 > 0) {
+        float hdop_max = (float)app->settings.hdop_max_x10 / 10.0f;
+        if(app->hdop > hdop_max) return;
+    }
 
     // Filtre de distance : skip si on n'a pas assez bougé depuis le dernier trkpt.
     uint8_t min_dist = app->settings.track_min_dist_m;

@@ -17,8 +17,12 @@
 #include "notes_cache.h"
 #include "storage_helpers.h"
 
-// Seuil de qualité GPS au-delà duquel on refuse OK court (force = OK long)
-#define HDOP_MAX 2.5f
+// Récupère le seuil HDOP depuis les settings (0 = gate désactivé)
+// Retourne un float exploitable par la comparaison (ou 99999 si off).
+static float quick_log_hdop_max(const App* app) {
+    if(app->settings.hdop_max_x10 == 0) return 99999.0f;
+    return (float)app->settings.hdop_max_x10 / 10.0f;
+}
 
 typedef struct {
     bool has_fix;
@@ -51,6 +55,9 @@ typedef struct {
     float avg_min_hdop;
     float avg_cur_lat;
     float avg_cur_lon;
+
+    // Overlay "Saving..." (affiché entre OK et l'exécution du save au tick)
+    bool saving;
 } QuickLogModel;
 
 static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
@@ -60,6 +67,16 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
     if(!p) return;
 
     canvas_clear(canvas);
+
+    // Overlay "Saving..." : affiché entre OK et l'exécution du save au tick
+    if(m->saving) {
+        canvas_set_font(canvas, FontPrimary);
+        elements_multiline_text_aligned(canvas, 64, 20, AlignCenter, AlignTop, "Saving...");
+        canvas_set_font(canvas, FontSecondary);
+        elements_multiline_text_aligned(
+            canvas, 64, 40, AlignCenter, AlignTop, "writing to SD");
+        return;
+    }
 
     // Overlay averaging : collecte active de samples GPS
     if(m->averaging) {
@@ -126,7 +143,7 @@ static void quick_log_draw_callback(Canvas* canvas, void* ctx) {
         }
 
         elements_multiline_text_aligned(
-            canvas, 64, 62, AlignCenter, AlignBottom, "OK=save anyway  Back=cancel");
+            canvas, 64, 62, AlignCenter, AlignBottom, "OK save  Back cancel");
         return;
     }
 
@@ -276,10 +293,13 @@ static bool quick_log_write_point(
     const Preset* p, bool forced_note_avg) {
     if(!p) return false;
 
+    FURI_LOG_D("OSM", "write_point: pre_save_check");
     if(!storage_pre_save_check(app->last_error, sizeof(app->last_error))) {
+        FURI_LOG_E("OSM", "write_point: pre_save_check FAILED: %s", app->last_error);
         notification_message(app->notification, &sequence_error);
         return false;
     }
+    FURI_LOG_D("OSM", "write_point: storage_write_all_formats");
 
     char tag[64];
     preset_build_tag(p, app->current_variant, tag, sizeof(tag));
@@ -313,11 +333,13 @@ static bool quick_log_write_point(
     const char* note = final_note[0] ? final_note : NULL;
 
     storage_write_all_formats(lat, lon, altitude, hdop, sats, tag, note);
+    FURI_LOG_D("OSM", "write_point: formats written, saving note cache");
 
     // Cache de note (on persiste juste la note utilisateur, pas photo/avg)
     char primary[48];
     preset_build_primary_tag(p, primary, sizeof(primary));
     notes_cache_save(primary, app->quick_note);
+    FURI_LOG_D("OSM", "write_point: done");
 
     // Tracker du dernier point
     app->last_saved_tick = furi_get_tick();
@@ -334,9 +356,14 @@ static bool quick_log_write_point(
 }
 
 static bool quick_log_do_save(App* app, bool force) {
+    FURI_LOG_D("OSM", "save: start preset=%u force=%d", app->current_preset, force);
     const Preset* p = presets_get(app->current_preset);
     if(!p) p = presets_get(0);
-    if(!p) return false;
+    if(!p) {
+        FURI_LOG_E("OSM", "save: no preset available");
+        return false;
+    }
+    FURI_LOG_D("OSM", "save: preset=%s", p->label);
 
     // "Fix effectif" = on considère qu'on a un fix si un fix a été reçu dans
     // les 5 dernières secondes (même logique que l'affichage). Évite de
@@ -350,15 +377,21 @@ static bool quick_log_do_save(App* app, bool force) {
         recent_fix = (age_ticks < 5 * freq);
     }
     bool effective_fix = app->has_fix || recent_fix;
-    bool quality_ok = effective_fix && (app->hdop <= HDOP_MAX);
+    float hdop_max = quick_log_hdop_max(app);
+    bool quality_ok = effective_fix && (app->hdop <= hdop_max);
+    FURI_LOG_D(
+        "OSM", "save: fix=%d recent=%d hdop=%.2f max=%.2f ok=%d",
+        app->has_fix, recent_fix, (double)app->hdop, (double)hdop_max, quality_ok);
     if(!quality_ok && !force) {
         if(!effective_fix) {
             snprintf(app->last_error, sizeof(app->last_error),
                      "No GPS fix\nHold OK to force");
         } else {
             snprintf(app->last_error, sizeof(app->last_error),
-                     "HDOP %.1f > 2.5\nHold OK to force", (double)app->hdop);
+                     "HDOP %.1f > %.1f\nHold OK to force",
+                     (double)app->hdop, (double)hdop_max);
         }
+        FURI_LOG_I("OSM", "save: refused quality (%s)", app->last_error);
         notification_message(app->notification, &sequence_error);
         return false;
     }
@@ -367,10 +400,13 @@ static bool quick_log_do_save(App* app, bool force) {
     if(!force && app->settings.duplicate_check_m > 0) {
         char tag_for_dup[64];
         preset_build_tag(p, app->current_variant, tag_for_dup, sizeof(tag_for_dup));
+        FURI_LOG_D("OSM", "save: dup check starting (%um)", app->settings.duplicate_check_m);
         float dist = 0;
-        if(storage_find_duplicate_nearby(
-               app->lat, app->lon, tag_for_dup,
-               app->settings.duplicate_check_m, &dist)) {
+        bool found = storage_find_duplicate_nearby(
+            app->lat, app->lon, tag_for_dup,
+            app->settings.duplicate_check_m, &dist);
+        FURI_LOG_D("OSM", "save: dup check done (found=%d dist=%.1f)", found, (double)dist);
+        if(found) {
             app->duplicate_warning = true;
             app->duplicate_dist_m = dist;
             notification_message(app->notification, &sequence_error);
@@ -378,8 +414,11 @@ static bool quick_log_do_save(App* app, bool force) {
         }
     }
 
-    return quick_log_write_point(
+    FURI_LOG_D("OSM", "save: calling write_point");
+    bool ok = quick_log_write_point(
         app, app->lat, app->lon, app->hdop, app->sats, app->altitude, p, false);
+    FURI_LOG_I("OSM", "save: result=%d", ok);
+    return ok;
 }
 
 // --- Averaging : démarrage / tick / finalisation ---
@@ -445,6 +484,10 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
     bool ok_long = (event->type == InputTypeLong && event->key == InputKeyOk);
     bool is_press = (event->type == InputTypeShort || event->type == InputTypeRepeat);
 
+    // Bloque toutes les touches pendant un save différé : évite que l'utilisateur
+    // re-déclenche save_deferred avant que le tick n'ait consommé le précédent.
+    if(app->save_deferred) return true;
+
     // Overlay erreur : n'importe quelle touche efface, on reste sur Quick Log
     if(app->last_error[0]) {
         if(event->type == InputTypeShort) {
@@ -463,16 +506,20 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
         return true;
     }
 
-    // Overlay doublon : OK = save anyway (force), Back = annule
+    // Overlay doublon : OK = save anyway (force, différé), Back = annule
     if(app->duplicate_warning) {
         if(ok_short || ok_long) {
             app->duplicate_warning = false;
-            quick_log_do_save(app, true); // force=true -> skip duplicate check
+            app->preview_pending = false;
+            // Différer : la frame suivante affiche "Saving..." avant le blocage I/O
+            app->save_deferred = true;
+            app->save_deferred_force = true;
             quick_log_refresh(app);
             return true;
         }
         if(event->type == InputTypeShort && event->key == InputKeyBack) {
             app->duplicate_warning = false;
+            app->preview_pending = false;
             quick_log_refresh(app);
             return true;
         }
@@ -482,24 +529,25 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
     // Mode preview (confirmation) : gestion spéciale des touches
     if(app->preview_pending) {
         if(ok_short) {
-            quick_log_do_save(app, false); // force=false : respecte gate HDOP
             app->preview_pending = false;
+            app->save_deferred = true;
+            app->save_deferred_force = false;
             quick_log_refresh(app);
             return true;
         }
         if(ok_long) {
-            quick_log_do_save(app, true); // force=true : ignore gate
             app->preview_pending = false;
+            app->save_deferred = true;
+            app->save_deferred_force = true;
             quick_log_refresh(app);
             return true;
         }
         if(event->type == InputTypeShort && event->key == InputKeyBack) {
-            // Annule le preview, reste sur Quick Log
             app->preview_pending = false;
             quick_log_refresh(app);
             return true;
         }
-        return true; // en preview, on bloque les autres touches
+        return true;
     }
 
     // ←/→ : cycle sur les variantes du preset courant
@@ -532,9 +580,10 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
     }
 
     if(ok_short || ok_long) {
-        // OK long : force save instantané, quelle que soit la config
+        // OK long : force save (différé), quelle que soit la config
         if(ok_long) {
-            quick_log_do_save(app, true);
+            app->save_deferred = true;
+            app->save_deferred_force = true;
             quick_log_refresh(app);
             return true;
         }
@@ -550,8 +599,9 @@ static bool quick_log_input_callback(InputEvent* event, void* ctx) {
             quick_log_refresh(app);
             return true;
         }
-        // Sinon : save instantané
-        quick_log_do_save(app, false);
+        // Sinon : save (différé), respecte gate HDOP
+        app->save_deferred = true;
+        app->save_deferred_force = false;
         quick_log_refresh(app);
         return true;
     }
@@ -579,6 +629,14 @@ static void quick_log_enter(void* ctx) {
 }
 static void quick_log_exit(void* ctx) {
     (void)ctx;
+}
+
+void quick_log_tick_deferred(App* app) {
+    if(!app->save_deferred) return;
+    bool force = app->save_deferred_force;
+    app->save_deferred = false;
+    app->save_deferred_force = false;
+    quick_log_do_save(app, force);
 }
 
 void quick_log_refresh(App* app) {
@@ -641,6 +699,7 @@ void quick_log_refresh(App* app) {
                     sizeof(m->last_saved_time) - 1);
             m->last_saved_time[sizeof(m->last_saved_time) - 1] = '\0';
 
+            m->saving = app->save_deferred;
             // Averaging — snapshot de l'état courant pour l'overlay
             m->averaging = app->averaging;
             m->avg_total_s = app->settings.avg_seconds;

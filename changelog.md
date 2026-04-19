@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11 — 2026-04-19
+
+### Added
+- **Seuil HDOP configurable** via Settings `HDOP max` : off / 2.5 / 3.0 / 5.0 / 10.0. Défaut 5.0, plus permissif que les 2.5 hardcodés avant — le NEO-6M consumer a typiquement un HDOP de 2.5-5 même avec un bon fix. Le seuil s'applique à Quick Log (gate OK court) et au mode trace quand `track_hdop_strict` est activé. Résout le bug "save refusé HDOP 2.6 > 2.5" en conditions normales d'usage.
+- Nouvelle clé `hdop_max_x10` dans `settings.txt` (stockage en dixièmes pour permettre 2.5 sans float).
+
+### Changed
+- Le message de refus affiche désormais le seuil actif (`HDOP 6.2 > 5.0`) au lieu du `2.5` hardcodé.
+
 ## 0.10 — 2026-04-19
 
 Itération de polish suite aux premiers tests terrain.

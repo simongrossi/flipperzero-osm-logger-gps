@@ -57,6 +57,7 @@ void notes_cache_load(const char* primary_tag, char* out, size_t out_size) {
 
 void notes_cache_save(const char* primary_tag, const char* note) {
     if(!primary_tag || !*primary_tag) return;
+    FURI_LOG_D("OSM", "notes_cache_save: start");
 
     Storage* s = furi_record_open(RECORD_STORAGE);
 
@@ -64,33 +65,38 @@ void notes_cache_save(const char* primary_tag, const char* note) {
     if(storage_common_stat(s, "/ext/apps_data/osm_logger", &fi) != FSE_OK) {
         storage_common_mkdir(s, "/ext/apps_data/osm_logger");
     }
+    FURI_LOG_D("OSM", "notes_cache_save: dir ok");
 
-    // Lit l'existant (si présent)
-    File* f = storage_file_alloc(s);
+    // Étape 1 — lecture du contenu existant (dans son propre File*)
     char* existing = NULL;
     uint32_t existing_size = 0;
-    if(f && storage_file_open(f, NOTES_CACHE_FILE, FSAM_READ, FSOM_OPEN_EXISTING)) {
-        uint64_t sz = storage_file_size(f);
-        if(sz > 0 && sz <= NOTES_CACHE_MAX) {
-            existing = malloc((size_t)sz + 1);
-            if(existing) {
-                existing_size = storage_file_read(f, existing, (uint16_t)sz);
-                existing[existing_size] = '\0';
+    {
+        File* rf = storage_file_alloc(s);
+        if(rf && storage_file_open(rf, NOTES_CACHE_FILE, FSAM_READ, FSOM_OPEN_EXISTING)) {
+            uint64_t sz = storage_file_size(rf);
+            if(sz > 0 && sz <= NOTES_CACHE_MAX) {
+                existing = malloc((size_t)sz + 1);
+                if(existing) {
+                    existing_size = storage_file_read(rf, existing, (uint16_t)sz);
+                    existing[existing_size] = '\0';
+                }
             }
+            storage_file_close(rf);
         }
-        storage_file_close(f);
+        if(rf) storage_file_free(rf);
     }
+    FURI_LOG_D("OSM", "notes_cache_save: read ok (%lu B)", (unsigned long)existing_size);
 
+    // Étape 2 — construction du nouveau buffer (sans la ligne du primary_tag + append)
     char* new_buf = malloc(NOTES_CACHE_MAX);
     if(!new_buf) {
         if(existing) free(existing);
-        if(f) storage_file_free(f);
         furi_record_close(RECORD_STORAGE);
+        FURI_LOG_E("OSM", "notes_cache_save: malloc failed");
         return;
     }
     size_t new_size = 0;
 
-    // Recopie tout sauf la ligne de ce primary_tag
     if(existing) {
         size_t pt_len = strlen(primary_tag);
         char* p = existing;
@@ -112,7 +118,6 @@ void notes_cache_save(const char* primary_tag, const char* note) {
         free(existing);
     }
 
-    // Append la nouvelle note si non vide
     if(note && *note) {
         int n = snprintf(
             new_buf + new_size,
@@ -124,13 +129,22 @@ void notes_cache_save(const char* primary_tag, const char* note) {
             new_size += (size_t)n;
         }
     }
+    FURI_LOG_D("OSM", "notes_cache_save: rebuilt (%lu B)", (unsigned long)new_size);
 
-    // Réécrit
-    if(f && storage_file_open(f, NOTES_CACHE_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
-        if(new_size > 0) storage_file_write(f, new_buf, new_size);
-        storage_file_close(f);
+    // Étape 3 — écriture du fichier (dans son propre File*, séparé du read)
+    {
+        File* wf = storage_file_alloc(s);
+        if(wf && storage_file_open(wf, NOTES_CACHE_FILE, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+            if(new_size > 0) storage_file_write(wf, new_buf, new_size);
+            storage_file_close(wf);
+            FURI_LOG_D("OSM", "notes_cache_save: write ok");
+        } else {
+            FURI_LOG_E("OSM", "notes_cache_save: write open FAILED");
+        }
+        if(wf) storage_file_free(wf);
     }
     free(new_buf);
-    if(f) storage_file_free(f);
+
     furi_record_close(RECORD_STORAGE);
+    FURI_LOG_D("OSM", "notes_cache_save: done");
 }

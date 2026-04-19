@@ -111,6 +111,10 @@ typedef struct App {
     char last_saved_preset[24]; // label du preset (ex. "Bench")
     char last_saved_time[8];    // "HH:MM" du RTC au moment du save
 
+    // --- Save différé au prochain tick (permet d'afficher "Saving..." avant le blocage I/O) ---
+    bool save_deferred;
+    bool save_deferred_force;
+
     // --- Averaging mode (collecte de N secondes de samples GPS) ---
     bool averaging;                // true pendant la collecte
     uint32_t averaging_start_tick; // tick au démarrage
