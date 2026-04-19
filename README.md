@@ -150,13 +150,15 @@ The main menu also has `GPS status` (dedicated diagnostic view) and `About`.
 
 ## 📚 Documentation
 
-- **[docs/HARDWARE.md](docs/HARDWARE.md)** — supported GPS modules, wiring, first fix, troubleshooting
-- **[docs/FORMATS.md](docs/FORMATS.md)** — detailed spec of the 5 output formats, field by field
-- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — code structure, adding a preset, adding a view, debugging, known pitfalls
-- **[docs/ROADMAP.md](docs/ROADMAP.md)** — planned features (not yet implemented) with implementation hints
-- **[docs/GETTING_STARTED_OSM.md](docs/GETTING_STARTED_OSM.md)** — beginner-friendly OSM contributor guide (zero to first upload)
-- **[src/presets.c](src/presets.c)** — the 23 default presets (editable by rebuilding, or override via `presets.txt` on SD)
-- **[presets.txt.sample](presets.txt.sample)** — sample presets file (in French, shows the syntax)
+**📖 Bilingual docs index**: [docs/README.md](docs/README.md) — pick English 🇬🇧 or French 🇫🇷
+
+Direct links:
+- Hardware & wiring: 🇬🇧 [HARDWARE.en.md](docs/HARDWARE.en.md) · 🇫🇷 [HARDWARE.md](docs/HARDWARE.md)
+- Output formats: 🇬🇧 [FORMATS.en.md](docs/FORMATS.en.md) · 🇫🇷 [FORMATS.md](docs/FORMATS.md)
+- OSM beginner tutorial: 🇬🇧 [GETTING_STARTED_OSM.en.md](docs/GETTING_STARTED_OSM.en.md) · 🇫🇷 [GETTING_STARTED_OSM.md](docs/GETTING_STARTED_OSM.md)
+- Developer docs (French only for now): [DEVELOPMENT.md](docs/DEVELOPMENT.md), [ROADMAP.md](docs/ROADMAP.md)
+- [src/presets.c](src/presets.c) — the 65 default presets (editable by rebuilding, or override via `presets.txt` on SD)
+- [presets.txt.sample](presets.txt.sample) — sample presets file (in French, shows the syntax)
 
 ---
 

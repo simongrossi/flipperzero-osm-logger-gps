@@ -25,7 +25,7 @@ application.fam      # manifest ufbt
 
 | ID | Vue               | Type         | Back → |
 |----|-------------------|--------------|--------|
-| 0  | `AppViewMenu`     | Submenu      | exit app (nav callback retourne false) |
+| 0  | `AppViewMenu`     | Menu (icons) | exit app (nav callback retourne false) |
 | 1  | `AppViewPresets`  | Submenu      | `AppViewMenu` (previous_callback) |
 | 2  | `AppViewQuickLog` | View+model   | `AppViewPresets` (previous_callback) |
 | 3  | `AppViewTrack`    | View+model   | `AppViewMenu` (previous_callback) |

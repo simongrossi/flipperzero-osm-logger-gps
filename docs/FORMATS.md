@@ -19,9 +19,11 @@ Une ligne JSON par point sauvegardé :
 | `hdop` | number   | HDOP au moment du save (2 → 4 m, 1 → 2 m, 5+ = douteux)         |
 | `sats` | integer  | Nb de satellites utilisés pour le fix                           |
 | `tag`  | string   | Tag OSM au format `key=value` ou tags multiples séparés par `;` (ex. `amenity=bench` ou `amenity=bench;material=wood` pour une variante à tag additionnel) |
-| `note` | string   | Note courte saisie via l'éditeur TextInput (Up dans Quick Log), chaîne vide sinon |
+| `note` | string   | Note libre. Peut contenir : la note utilisateur (via `Up` → TextInput), `photo:N` si `Auto photo ID` activé, `avg` si le point a été sauvé via le mode averaging. Exemple combiné : `"wooden photo:12 avg"` |
 
 **Point forcé** (OK long sans fix) : `lat=0`, `lon=0`, `alt=0`, `hdop=99.9` → ignorer ces points au post-traitement si besoin.
+
+**Point averaged** : enregistré via le mode Averaging (Settings → `Averaging` ≥ 5s). Les `lat`/`lon` sont la moyenne de N samples collectés pendant la capture. `hdop` reflète le **meilleur** HDOP observé pendant l'averaging (pas la moyenne). Le note contient `avg`.
 
 ## `notes.csv` — CSV sans header
 
@@ -75,7 +77,13 @@ python3 scripts/jsonl_to_geojson.py points.jsonl > points_from_jsonl.geojson
 
 ## `track.gpx` — Mode trace (auto-log GPX)
 
-Écrit par le **Mode trace** du menu principal. Un timer périodique (5 s) ajoute un `<trkpt>` à chaque tick tant que la vue est active et qu'un fix GPS est disponible. Chaque entrée dans le mode trace démarre un nouveau `<trkseg>` (segment), ce qui permet à JOSM/QGIS de ne pas tracer de ligne entre deux sessions de tracking pausées.
+Écrit par le **Mode trace** du menu principal. Un timer périodique (intervalle configurable via Settings → `Track interval` : 1 / 5 / 10 / 30 / 60 s) ajoute un `<trkpt>` à chaque tick tant que la vue est active et qu'un fix GPS est disponible.
+
+Deux filtres optionnels pour la qualité des tracks :
+- `Track min dist` (off / 2 / 5 / 10 m) : skip les trkpts qui n'ont pas assez bougé depuis le précédent (évite les GPX pollués par les arrêts à un feu rouge)
+- `Track HDOP strict` (on/off) : rejette les trkpts avec HDOP supérieur au seuil configuré
+
+Chaque entrée dans le mode trace démarre un nouveau `<trkseg>` (segment), ce qui permet à JOSM/QGIS de ne pas tracer de ligne entre deux sessions de tracking pausées.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -95,3 +103,30 @@ python3 scripts/jsonl_to_geojson.py points.jsonl > points_from_jsonl.geojson
 Même stratégie **write-append-framed** que `points.gpx` : le fichier reste valide XML après chaque trkpt écrit, même en cas de coupure d'alim.
 
 Usage typique : activer le mode trace avant de démarrer un trajet à vélo, laisser tourner. À l'arrivée, importer `track.gpx` dans JOSM ou un visualiseur pour voir le parcours, et ajouter tes waypoints OSM par-dessus.
+
+## `notes_cache.txt` — cache des notes par preset (interne)
+
+Fichier interne, format TAB-séparé :
+```
+amenity=bench<TAB>wooden seat
+amenity=drinking_water<TAB>public fountain
+```
+
+Rempli automatiquement à chaque save si tu as tapé une note via l'éditeur `Up`. La prochaine fois que tu sélectionnes le même preset, la note associée est pré-chargée. Utile pour ne pas retaper `"out of order"` ou `"material=wood"` à chaque banc.
+
+Tu peux l'éditer manuellement via qFlipper si tu veux pré-remplir les notes.
+
+## Archive session
+
+Depuis le menu **Last points → Archive session**, l'app déplace les 5 fichiers courants (JSONL / CSV / GPX / GeoJSON / track.gpx) dans un sous-dossier daté :
+
+```
+/ext/apps_data/osm_logger/session_20260419T143025/
+  ├── points.jsonl
+  ├── notes.csv
+  ├── points.gpx
+  ├── points.geojson
+  └── track.gpx
+```
+
+Après archivage, les compteurs session et total sont remis à zéro, et la session suivante repart de zéro. Pratique pour séparer tes sessions (ex. « matin sur Paris », « après-midi sur Brest »).

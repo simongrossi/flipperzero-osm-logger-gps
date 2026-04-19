@@ -5,7 +5,7 @@
 - **GPS NEO-6M V2** (u-blox NEO-6) — sortie NMEA 0183, 9600 bauds, 1 Hz
 - Antenne céramique (fournie avec le module) ou antenne active externe via U.FL
 
-> D'autres modules NMEA 9600 bauds devraient marcher (PA1010D, BN-180, etc.) mais non testés. Si tu testes avec succès, n'hésite pas à ouvrir une PR.
+> D'autres modules NMEA devraient marcher (PA1010D, BN-180, NEO-M8N, etc.). Le **baud rate est configurable** via Settings → `GPS baud` (4800 / 9600 / 19200 / 38400 / 57600 / 115200). Si tu testes avec succès un autre module, ouvre une PR pour mettre à jour cette liste.
 
 ## Câblage sur Flipper Zero
 
@@ -63,10 +63,24 @@ Après le premier fix en extérieur, le module garde un warm start de quelques m
 2. **Alim absente** — LED rouge du NEO-6M doit clignoter 1 Hz quand fix OK, et reste allumée sans fix.
 3. **Conflit UART** — sur Momentum/autres firmwares, le service *Expansion* intercepte l'UART. L'app le désactive automatiquement, mais si tu vois du spam `ExpansionSrvWorker` dans les logs, ouvre une issue.
 4. **qFlipper tourne** — il monopolise le port série quand tu fais `ufbt launch`. Ferme-le avec Cmd+Q.
+5. **Baud rate mismatch** — si ton module n'est pas à 9600, ajuste Settings → `GPS baud`.
 
-**Voir les trames brutes** via la CLI Flipper :
+### Observer l'arrivée des trames
+
+Le moyen le plus rapide : va dans **Menu → GPS status** et regarde la ligne `NMEA: X B / Y lines`. Ce compteur monte en temps réel tant que l'UART reçoit. Trois cas :
+
+- **`0 B / 0 lines`** qui ne bougent pas → aucun octet reçu (fil, alim, module déconnecté)
+- **`X B / 0 lines`** qui monte mais Y=0 → octets reçus mais trames pas formées → baud rate faux
+- **X et Y montent** → l'UART marche, c'est juste la qualité du fix qui est mauvaise (va dehors, attends)
+
+### Logs détaillés via CLI
+
 ```bash
 ufbt cli
 > log debug
 ```
-Tu dois voir soit du silence (pas de GPS), soit des logs de parsing périodiques si tu as ajouté des `FURI_LOG_D` dans le code.
+
+L'app logge sous le tag `OSM` :
+- `[I][OSM] GPS fix acquired` à chaque transition no-fix → fix (cooldown 10 s)
+- `[D][OSM] save: ...`, `[D][OSM] write: ...` pour tracer chaque étape d'une sauvegarde
+- `[E][OSM] ...` pour les erreurs critiques (SD, allocations, ...)

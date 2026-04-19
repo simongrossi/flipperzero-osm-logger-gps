@@ -89,10 +89,32 @@ Quelques repères sur l'écran GPS Status :
 | `←` / `→`   | Cycler entre les variantes (wood / metal / concrete…)        |
 | `Up`        | Éditer une note courte (ex. "vandalisé", "en bois")          |
 | `Down`      | Effacer la note                                              |
-| `OK` court  | Sauvegarder (si fix bon, HDOP ≤ 2.5)                         |
+| `OK` court  | Sauvegarder (si fix bon, HDOP ≤ seuil configuré, défaut 5.0) |
 | `OK` long   | Forcer la sauvegarde même si le fix est dégradé              |
 
 **Règle d'or** : **positionne-toi à côté du POI** (moins de 2 m) avant de presser OK. Le GPS a une précision de l'ordre de 2-5 m.
+
+### 🎯 Mode précision (Averaging) — recommandé pour l'OSM sérieux
+
+Le GPS consumer a du bruit (±3-5 m par sample). Pour un POI important, active l'**averaging** :
+
+1. Menu → Settings → **Averaging** → cycle jusqu'à `10s` (ou `30s` pour plus précis)
+2. Retour à Quick Log. Maintenant **OK court** lance une collecte au lieu d'un save direct.
+3. Un écran `Averaging... N/10 s` s'affiche. Reste immobile le temps de la collecte.
+4. À la fin, l'app sauvegarde UN point avec les **coordonnées moyennées** des samples + le **meilleur HDOP observé** durant la capture.
+5. La note contient automatiquement `avg` pour distinguer ces points au post-traitement.
+
+Gains typiques : 30s d'averaging → précision de ~1 m au lieu de 5 m. Parfait pour les POIs très localisés (arbres remarquables, bornes, défibrillateurs).
+
+`OK long` court-circuite toujours l'averaging et fait un save instantané (utile quand tu n'as pas le temps d'attendre).
+
+### 🚫 Détection de doublons
+
+Par défaut, si tu essayes de sauver un tag qu'un autre point a déjà à moins de 10 m, un écran **`Duplicate?`** s'affiche avec la distance exacte. Tu peux :
+- **OK** = sauver quand même (force)
+- **Back** = annuler
+
+Configurable via Settings → `Dup check` (off / 5m / 10m / 25m). Évite les doublons quand tu repasses au même endroit.
 
 ---
 
