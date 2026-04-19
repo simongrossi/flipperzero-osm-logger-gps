@@ -10,6 +10,12 @@
 - `quick_log_write_point` : tag buffer passe de 64 à 128 octets pour accommoder la paire `source=survey;survey:date=...` (+36 chars fixes) en plus des tags preset + variantes.
 - `storage.c` (OSM XML writer) : `tag_copy` buffer passe de 96 à 160 octets pour parser les tags enrichis sans troncation.
 
+### Fixed
+- **Overlap `MIT License` / `Back` dans l'écran About** : les deux lignes étaient positionnées à y=52 et y=62 AlignBottom → chevauchement de ~5 px sur les dernières rows. Layout resserré (gaps de 10px entre chaque ligne, Back à y=63 AlignBottom) pour un rendu propre.
+
+### Docs
+- Screenshots mis à jour (v0.3 → v0.14) : 10 captures couvrant le flow complet (menu, catégories, presets, quick log, éditeur de note, post-save toast, track, last points, settings, about). README restructuré en 3 tableaux thématiques.
+
 ### Note pour les utilisateurs existants
 Le setting est off par défaut → aucun changement de comportement. Pour l'activer : Settings → Survey mode → on. Recommandé dès qu'on est en condition de vérification terrain (plutôt que de mapping "from memory" ou d'import).
 

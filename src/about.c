@@ -13,18 +13,15 @@ static void about_draw_callback(Canvas* canvas, void* ctx) {
     canvas_clear(canvas);
 
     canvas_set_font(canvas, FontPrimary);
-    elements_multiline_text_aligned(canvas, 64, 2, AlignCenter, AlignTop, "OSM Logger");
+    elements_multiline_text_aligned(canvas, 64, 0, AlignCenter, AlignTop, "OSM Logger");
 
     canvas_set_font(canvas, FontSecondary);
-    elements_multiline_text_aligned(
-        canvas, 64, 18, AlignCenter, AlignTop, "GPS POI logger");
-    elements_multiline_text_aligned(
-        canvas, 64, 28, AlignCenter, AlignTop, "by Simon Grossi");
-    elements_multiline_text_aligned(
-        canvas, 64, 40, AlignCenter, AlignTop, "github.com/simongrossi");
-    elements_multiline_text_aligned(canvas, 64, 52, AlignCenter, AlignTop, "MIT License");
+    elements_multiline_text_aligned(canvas, 64, 14, AlignCenter, AlignTop, "GPS POI logger");
+    elements_multiline_text_aligned(canvas, 64, 24, AlignCenter, AlignTop, "by Simon Grossi");
+    elements_multiline_text_aligned(canvas, 64, 34, AlignCenter, AlignTop, "github.com/simongrossi");
+    elements_multiline_text_aligned(canvas, 64, 44, AlignCenter, AlignTop, "MIT License");
 
-    elements_multiline_text_aligned(canvas, 64, 62, AlignCenter, AlignBottom, "Back");
+    elements_multiline_text_aligned(canvas, 64, 63, AlignCenter, AlignBottom, "Back");
 }
 
 static bool about_input_callback(InputEvent* event, void* ctx) {

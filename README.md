@@ -142,13 +142,17 @@ The main menu also has `GPS status` (dedicated diagnostic view) and `About`.
 
 ## 📷 Screenshots
 
-| Main menu | Preset picker | Quick Log |
-|-----------|---------------|-----------|
-| ![main menu](screenshots/01-menu.png) | ![preset picker](screenshots/02-presets.png) | ![quick log](screenshots/03-quicklog.png) |
+| Main menu | Categories | Presets |
+|-----------|------------|---------|
+| ![main menu](screenshots/01-menu.png) | ![categories](screenshots/02-categories.png) | ![presets](screenshots/03-presets.png) |
 
-| Track mode | GPS status |
-|------------|------------|
-| ![track mode](screenshots/04-track.png) | ![gps status](screenshots/05-status.png) |
+| Quick Log | Note editor | Post-save toast |
+|-----------|-------------|-----------------|
+| ![quick log](screenshots/04-quicklog.png) | ![note editor](screenshots/05-note-editor.png) | ![quick log saved](screenshots/06-quicklog-saved.png) |
+
+| Track mode | Last points | Settings | About |
+|------------|-------------|----------|-------|
+| ![track mode](screenshots/07-track.png) | ![last points](screenshots/08-last-points.png) | ![settings](screenshots/09-settings.png) | ![about](screenshots/10-about.png) |
 
 ## 📚 Documentation
 
