@@ -35,7 +35,7 @@ Colonnes : `time, lat, lon, alt, hdop, sats, tag, note` dans cet ordre.
 
 Guillemets doublés autour des champs texte pour Excel/LibreOffice. Les `"` dans `note` sont remplacés par `'` pour ne pas casser le parsing.
 
-> 💡 Pas de header → si tu imports dans un tableur, ajoute une première ligne manuellement.
+> 💡 Pas de header → lors de l'import dans un tableur, ajouter une première ligne manuellement.
 
 ## `points.gpx` — GPX 1.1 (waypoints) avec extensions OsmAnd Favorites
 
@@ -95,7 +95,7 @@ Fichier au format **OSM API 0.6** chargeable directement dans **JOSM** comme **d
 
 ### Convention des IDs
 
-Les IDs sont négatifs incrémentaux (`-1`, `-2`, `-3`…) — c'est la **convention OSM API** pour les nodes "nouveaux" pas encore uploadés. JOSM les reconnaît automatiquement et t'invite à les créer réellement sur le serveur au moment de l'upload.
+Les IDs sont négatifs incrémentaux (`-1`, `-2`, `-3`…) — c'est la **convention OSM API** pour les nodes "nouveaux" pas encore uploadés. JOSM les reconnaît automatiquement et propose de les créer réellement sur le serveur au moment de l'upload.
 
 ### Tags générés
 
@@ -106,10 +106,10 @@ Les IDs sont négatifs incrémentaux (`-1`, `-2`, `-3`…) — c'est la **conven
 
 ### Workflow recommandé
 
-1. Transférer `points.osm` vers ton ordi via qFlipper
+1. Transférer `points.osm` vers l'ordinateur via qFlipper
 2. Ouvrir JOSM → **Fichier → Ouvrir** → choisir le `.osm` → accepter "Ouvrir comme fichier OSM (data layer)"
 3. Chaque point apparaît comme un vrai node OSM éditable. Modifier les tags si besoin.
-4. Avant upload : **Édition → Rechercher** → `type:node flipper:*` pour sélectionner tes tags Flipper, puis **Supprimer** pour les retirer (uniquement si tu le souhaites).
+4. Avant upload : **Édition → Rechercher** → `type:node flipper:*` pour sélectionner les tags Flipper, puis **Supprimer** pour les retirer (uniquement si souhaité).
 5. **Fichier → Uploader** → les nodes sont créés sur OSM avec leurs bons IDs.
 
 C'est **LE format pro** pour un workflow OSM complet. `points.gpx` reste utile pour la visualisation rapide dans OsmAnd/QGIS, `points.osm` est pour l'édition et l'upload.
@@ -128,7 +128,7 @@ C'est **LE format pro** pour un workflow OSM complet. `points.gpx` reste utile p
 
 ## Post-traitement optionnel
 
-Le script [scripts/jsonl_to_geojson.py](../scripts/jsonl_to_geojson.py) reste dispo si tu préfères partir du JSONL (plus riche — garde `note` et timestamp séparés). Sinon le GeoJSON natif est directement utilisable.
+Le script [scripts/jsonl_to_geojson.py](../scripts/jsonl_to_geojson.py) reste dispo pour partir du JSONL (plus riche — garde `note` et timestamp séparés). Sinon le GeoJSON natif est directement utilisable.
 
 ```bash
 python3 scripts/jsonl_to_geojson.py points.jsonl > points_from_jsonl.geojson
@@ -161,7 +161,7 @@ Chaque entrée dans le mode trace démarre un nouveau `<trkseg>` (segment), ce q
 
 Même stratégie **write-append-framed** que `points.gpx` : le fichier reste valide XML après chaque trkpt écrit, même en cas de coupure d'alim.
 
-Usage typique : activer le mode trace avant de démarrer un trajet à vélo, laisser tourner. À l'arrivée, importer `track.gpx` dans JOSM ou un visualiseur pour voir le parcours, et ajouter tes waypoints OSM par-dessus.
+Usage typique : activer le mode trace avant de démarrer un trajet à vélo, laisser tourner. À l'arrivée, importer `track.gpx` dans JOSM ou un visualiseur pour voir le parcours, et ajouter les waypoints OSM par-dessus.
 
 ## `notes_cache.txt` — cache des notes par preset (interne)
 
@@ -171,9 +171,9 @@ amenity=bench<TAB>wooden seat
 amenity=drinking_water<TAB>public fountain
 ```
 
-Rempli automatiquement à chaque save si tu as tapé une note via l'éditeur `Up`. La prochaine fois que tu sélectionnes le même preset, la note associée est pré-chargée. Utile pour ne pas retaper `"out of order"` ou `"material=wood"` à chaque banc.
+Rempli automatiquement à chaque save si une note a été tapée via l'éditeur `Up`. La prochaine fois que ce même preset est sélectionné, la note associée est pré-chargée. Utile pour ne pas retaper `"out of order"` ou `"material=wood"` à chaque banc.
 
-Tu peux l'éditer manuellement via qFlipper si tu veux pré-remplir les notes.
+Il est possible de l'éditer manuellement via qFlipper pour pré-remplir les notes.
 
 ## Archive session
 
@@ -188,4 +188,4 @@ Depuis le menu **Last points → Archive session**, l'app déplace les 5 fichier
   └── track.gpx
 ```
 
-Après archivage, les compteurs session et total sont remis à zéro, et la session suivante repart de zéro. Pratique pour séparer tes sessions (ex. « matin sur Paris », « après-midi sur Brest »).
+Après archivage, les compteurs session et total sont remis à zéro, et la session suivante repart de zéro. Pratique pour séparer les sessions (ex. « matin sur Paris », « après-midi sur Brest »).

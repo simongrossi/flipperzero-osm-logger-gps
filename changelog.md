@@ -11,10 +11,10 @@ Data quality release — élimine 4 sources d'incohérence dans les fichiers de 
 - **Workflow House number cassé** — le tag restait `addr:housenumber=TBD` même avec une note contenant le numéro → 0 valeur pour OSM. Nouveau comportement "note-as-value" : quand la valeur primaire d'un preset est un placeholder (`TBD`, `?`, `tbd`, `fill_me`) ET que la note user est "safe" (pas de `=` ni `;`), la note remplace le placeholder au save. Ex. preset "House number" + note "42" → tag final `addr:housenumber=42`. La note est alors retirée du champ `note` pour éviter la duplication. `auto_photo_id` reste appliqué normalement (`photo:N` seul dans la note).
 
 ### Note pour les utilisateurs existants
-Les fichiers historiques ne sont **pas rétro-corrigés** : les vieux points à (0,0) restent dans `points.jsonl`/`points.gpx`/etc. Pour repartir propre : **Last points → Clear all** ou **Archive session** avant ta prochaine vraie sortie.
+Les fichiers historiques ne sont **pas rétro-corrigés** : les vieux points à (0,0) restent dans `points.jsonl`/`points.gpx`/etc. Pour repartir propre : **Last points → Clear all** ou **Archive session** avant la prochaine vraie sortie.
 
 ### Convention étendue pour les presets custom
-Dans ton `presets.txt`, tu peux maintenant utiliser `TBD` comme valeur placeholder pour les presets où le numéro/identifiant est saisi à la volée :
+Dans le `presets.txt`, il est maintenant possible d'utiliser `TBD` comme valeur placeholder pour les presets où le numéro/identifiant est saisi à la volée :
 ```
 Room number;addr:flats;TBD;13
 ```

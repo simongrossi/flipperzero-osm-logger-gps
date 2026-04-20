@@ -5,7 +5,7 @@
 - **GPS NEO-6M V2** (u-blox NEO-6) — sortie NMEA 0183, 9600 bauds, 1 Hz
 - Antenne céramique (fournie avec le module) ou antenne active externe via U.FL
 
-> D'autres modules NMEA devraient marcher (PA1010D, BN-180, NEO-M8N, etc.). Le **baud rate est configurable** via Settings → `GPS baud` (4800 / 9600 / 19200 / 38400 / 57600 / 115200). Si tu testes avec succès un autre module, ouvre une PR pour mettre à jour cette liste.
+> D'autres modules NMEA devraient marcher (PA1010D, BN-180, NEO-M8N, etc.). Le **baud rate est configurable** via Settings → `GPS baud` (4800 / 9600 / 19200 / 38400 / 57600 / 115200). En cas de test réussi avec un autre module, ouvrir une PR pour mettre à jour cette liste.
 
 ## Câblage sur Flipper Zero
 
@@ -42,7 +42,7 @@ Le Flipper Zero expose son **USART1** sur les pins 13 (TX) et 14 (RX) du GPIO pr
 
 L'app ne fait que **lire** les trames NMEA émises par le GPS (1 Hz). Elle ne renvoie jamais de commandes de configuration (ex. `$PMTK...` pour ublox) — le module fonctionne avec ses réglages par défaut. Donc la pin RX du GPS peut rester en l'air.
 
-Si tu veux un jour configurer le module (passer en 10 Hz, désactiver des trames, etc.), tu pourras relier le 4e fil : **pin 13 Flipper (TX) → RX GPS**.
+Pour configurer le module (passer en 10 Hz, désactiver des trames, etc.), il faudra relier le 4e fil : **pin 13 Flipper (TX) → RX GPS**.
 
 **⚠️ 3,3 V uniquement.** Le NEO-6M accepte 3,3 à 5 V côté alim, mais son TX peut sortir en 5 V si alimenté en 5 V → destruction possible de l'UART Flipper. Alimente-le impérativement en 3,3 V.
 
@@ -61,13 +61,13 @@ Après le premier fix en extérieur, le module garde un warm start de quelques m
 
 1. **Fils inversés** — le symptôme n°1. Vérifier : TX du GPS → pin 14 Flipper.
 2. **Alim absente** — LED rouge du NEO-6M doit clignoter 1 Hz quand fix OK, et reste allumée sans fix.
-3. **Conflit UART** — sur Momentum/autres firmwares, le service *Expansion* intercepte l'UART. L'app le désactive automatiquement, mais si tu vois du spam `ExpansionSrvWorker` dans les logs, ouvre une issue.
-4. **qFlipper tourne** — il monopolise le port série quand tu fais `ufbt launch`. Ferme-le avec Cmd+Q.
-5. **Baud rate mismatch** — si ton module n'est pas à 9600, ajuste Settings → `GPS baud`.
+3. **Conflit UART** — sur Momentum/autres firmwares, le service *Expansion* intercepte l'UART. L'app le désactive automatiquement, mais en cas de spam `ExpansionSrvWorker` dans les logs, ouvrir une issue.
+4. **qFlipper tourne** — il monopolise le port série lors du `ufbt launch`. Le fermer avec Cmd+Q.
+5. **Baud rate mismatch** — si le module n'est pas à 9600, ajuster Settings → `GPS baud`.
 
 ### Observer l'arrivée des trames
 
-Le moyen le plus rapide : va dans **Menu → GPS status** et regarde la ligne `NMEA: X B / Y lines`. Ce compteur monte en temps réel tant que l'UART reçoit. Trois cas :
+Le moyen le plus rapide : aller dans **Menu → GPS status** et regarder la ligne `NMEA: X B / Y lines`. Ce compteur monte en temps réel tant que l'UART reçoit. Trois cas :
 
 - **`0 B / 0 lines`** qui ne bougent pas → aucun octet reçu (fil, alim, module déconnecté)
 - **`X B / 0 lines`** qui monte mais Y=0 → octets reçus mais trames pas formées → baud rate faux

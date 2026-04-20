@@ -47,7 +47,7 @@ Fait via le script Python `scripts/build_presets.py` qui télécharge `presets.j
 À chaque save, ajouter dans le JSONL une URL MapComplete qui ouvre la vue sur ce point. Permet vérification visuelle rapide au post-traitement.
 
 ### StreetComplete quest export
-Format compatible StreetComplete pour dispatcher tes points à d'autres mappeurs. Le format n'est pas documenté officiellement mais existant.
+Format compatible StreetComplete pour dispatcher les points à d'autres mappeurs. Le format n'est pas documenté officiellement mais existant.
 
 ### OpenStreetMap username dans Settings
 Pré-crediter dans les métadonnées de tous les fichiers. Setting texte dans Settings.

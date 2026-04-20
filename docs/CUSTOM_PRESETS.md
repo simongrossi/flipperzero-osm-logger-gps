@@ -2,7 +2,7 @@
 
 L'app embarque **65 presets OSM** compilés par défaut, couvrant les POIs les plus fréquents (mobilier urbain, commerces, transports, etc.). C'est suffisant pour la plupart des sessions terrain.
 
-Si tu veux **plus de presets** (jusqu'à **128**, la limite actuelle de `PRESETS_MAX_ENTRIES`) ou des presets **traduits dans ta langue**, tu peux déposer un `presets.txt` sur la microSD du Flipper :
+Pour avoir **plus de presets** (jusqu'à **128**, la limite actuelle de `PRESETS_MAX_ENTRIES`) ou des presets **traduits**, il est possible de déposer un fichier `presets.txt` sur la microSD du Flipper :
 
 ```
 /ext/apps_data/osm_logger/presets.txt
@@ -102,7 +102,7 @@ Options :
 1. Lance le script → obtiens `presets.txt` en local.
 2. Branche le Flipper, ouvre qFlipper (ou monte la microSD).
 3. Copie `presets.txt` dans `/ext/apps_data/osm_logger/`.
-4. Redémarre l'app OSM Logger → les nouveaux presets sont chargés (visible dans la console série si tu la regardes).
+4. Redémarrer l'app OSM Logger → les nouveaux presets sont chargés (visible dans la console série si consultée).
 
 ### Sous le capot
 
@@ -118,7 +118,7 @@ Le script :
 
 ### Personnaliser le mapping
 
-Si tu veux que certains tags tombent dans une catégorie différente, édite la liste `CATEGORY_RULES` en tête du script. Les règles sont appliquées **dans l'ordre**, première correspondance gagne. Exemple pour classer `amenity=fountain` comme Nature plutôt que Street furniture :
+Pour que certains tags tombent dans une catégorie différente, éditer la liste `CATEGORY_RULES` en tête du script. Les règles sont appliquées **dans l'ordre**, la première correspondance gagne. Exemple pour classer `amenity=fountain` comme Nature plutôt que Street furniture :
 
 ```python
 CATEGORY_RULES = [
@@ -131,6 +131,6 @@ CATEGORY_RULES = [
 
 ## Retour d'expérience / contribution
 
-Si tu as généré une liste particulièrement utile (ex. `presets_fr_urbain_complet.txt` pour cartographie urbaine), n'hésite pas à ouvrir une PR pour l'ajouter à un futur dossier `presets_samples/` dans le repo.
+En cas de génération d'une liste particulièrement utile (ex. `presets_fr_urbain_complet.txt` pour cartographie urbaine), ne pas hésiter à ouvrir une PR pour l'ajouter à un futur dossier `presets_samples/` dans le repo.
 
 Les ajouts de règles dans `CATEGORY_RULES` sont bienvenus : la logique actuelle est orientée "OSM generaliste", mais des cartographes spécialisés (bornes électriques, mobilier cyclable, etc.) auront des préférences différentes.

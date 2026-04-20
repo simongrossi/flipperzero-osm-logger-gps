@@ -1,6 +1,6 @@
 # Documentation
 
-Pick your language / Choisis ta langue :
+Pick your language / Choisir la langue :
 
 ## User docs / Docs utilisateur
 
@@ -22,4 +22,4 @@ Pour le moment en français uniquement (audience interne, les traductions sont b
 
 The English docs are the primary reference for the Apps Catalog submission. The French versions mirror the same content; if you spot a drift between them, please open an issue or a PR.
 
-Les docs en anglais sont la référence pour la soumission au Apps Catalog. Les versions françaises reflètent le même contenu ; si tu repères un décalage entre les deux, ouvre une issue ou une PR.
+Les docs en anglais sont la référence pour la soumission au Apps Catalog. Les versions françaises reflètent le même contenu ; en cas de décalage entre les deux, merci d'ouvrir une issue ou une PR.
